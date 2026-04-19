@@ -426,6 +426,27 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runDiff(args, config) {
+  stripColor();
+  if (args.length < 2) {
+    console.error('❌ ctx diff <snapshot-a> <snapshot-b>');
+    return 1;
+  }
+  const cwd = process.cwd();
+  const memoryDir = resolveMemoryDir(cwd, config);
+  const resolve = (n) => fs.existsSync(n) ? n : path.join(memoryDir, n);
+  const aPath = resolve(args[0]);
+  const bPath = resolve(args[1]);
+  if (!fs.existsSync(aPath) || !fs.existsSync(bPath)) {
+    console.error(`❌ Not found: ${!fs.existsSync(aPath) ? aPath : bPath}`);
+    return 1;
+  }
+  const { diffSnapshots } = require('./diff.js');
+  const { printDiff }     = require('./output.js');
+  printDiff(diffSnapshots(aPath, bPath));
+  return 0;
+}
+
 function runTimeline(_args, config) {
   stripColor();
   const cwd = process.cwd();
@@ -617,6 +638,8 @@ function main(argv) {
       return runAsk(rest, config);
     case 'timeline':
       return runTimeline(rest, config);
+    case 'diff':
+      return runDiff(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':

@@ -234,9 +234,23 @@ module.exports = {
   printHistory,
   printRetrieval,
   printTimeline,
+  printDiff,
   timeAgo,
   macNotify,
 };
+
+function printDiff(delta) {
+  console.log('');
+  console.log(C.bold + `  diff: ${delta.a}  →  ${delta.b}` + C.reset);
+  console.log('');
+  for (const [label, dd] of [['Files', delta.files], ['Decisions', delta.decisions], ['Failed attempts', delta.failedAttempts]]) {
+    console.log(C.bold + `  ${label}:` + C.reset);
+    if (dd.added.length)   for (const x of dd.added)   console.log(`    ${C.green}+ ${x}${C.reset}`);
+    if (dd.removed.length) for (const x of dd.removed) console.log(`    ${C.red}- ${x}${C.reset}`);
+    if (!dd.added.length && !dd.removed.length) console.log(C.gray + '    (no changes)' + C.reset);
+    console.log('');
+  }
+}
 
 function printTimeline(threads) {
   console.log('');
