@@ -7,7 +7,7 @@ const os   = require('os');
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects');
 
 function encodeCwd(cwd) {
-  return '-' + cwd.replace(/\//g, '-');
+  return '-' + cwd.replace(/^\//, '').replace(/[^a-zA-Z0-9]+/g, '-');
 }
 
 function projectDirFor(cwd) {

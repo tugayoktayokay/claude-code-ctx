@@ -19,6 +19,7 @@ test('extractText handles string, array blocks, and empty', () => {
   assert.equal(extractText(null), '');
 });
 
-test('encodeCwd prefixes with dash and replaces slashes', () => {
-  assert.equal(encodeCwd('/Users/foo/bar'), '--Users-foo-bar');
+test('encodeCwd matches Claude Code project dir format', () => {
+  assert.equal(encodeCwd('/Users/foo/bar'), '-Users-foo-bar');
+  assert.equal(encodeCwd('/Users/foo/apps/Ik Kolay'), '-Users-foo-apps-Ik-Kolay');
 });
