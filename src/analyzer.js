@@ -1,0 +1,191 @@
+'use strict';
+
+const { extractText } = require('./session.js');
+
+const CRITICAL_PATTERNS = [
+  { re: /kararı?[:\s]/i,                       label: 'karar' },
+  { re: /(?:sonuç|result)[:\s]/i,              label: 'sonuç' },
+  { re: /(?:hata|error)[:\s].{10,80}/i,        label: 'hata' },
+  { re: /(?:çözüm|solution|fix)[:\s]/i,        label: 'çözüm' },
+  { re: /TODO|FIXME|HACK|NOTE/,                label: 'todo/not' },
+  { re: /migration.*(?:add|remove|alter)/i,    label: 'migration' },
+  { re: /(?:port|url|endpoint)[:\s]\S+/i,      label: 'endpoint' },
+  { re: /(?:env|secret|key)[:\s]\S+/i,         label: 'config' },
+  { re: /olmadı|çalışmadı|denedik|başarısız/i, label: 'başarısız deneme' },
+];
+
+function categorize(text, categories, map) {
+  const lower = text.toLowerCase();
+  for (const [key, cat] of Object.entries(categories)) {
+    const words = cat.words || [];
+    if (words.some(w => lower.includes(w.toLowerCase()))) {
+      const entry = map.get(key) || { count: 0, examples: [], label: cat.label || key };
+      entry.count++;
+      if (entry.examples.length < 3) entry.examples.push(text.slice(0, 80));
+      map.set(key, entry);
+    }
+  }
+}
+
+function extractCritical(text, arr) {
+  for (const p of CRITICAL_PATTERNS) {
+    const m = text.match(p.re);
+    if (m) arr.push({ type: p.label, text: m[0].slice(0, 100) });
+  }
+}
+
+function analyzeEntries(entries, config) {
+  const categories = config?.categories || {};
+  const growthWindow = config?.limits?.growth_window || 5;
+
+  const analysis = {
+    messageCount: 0,
+    userMessages: 0,
+    assistantMessages: 0,
+    toolUses: 0,
+
+    contextTokens: 0,
+    totalOutput: 0,
+    tokenHistory: [],
+    tokenPerTurn: [],
+    avgGrowthPerTurn: 0,
+
+    activeCategories: new Map(),
+    filesModified: new Set(),
+    bashCommands: [],
+    criticalBits: [],
+    userIntents: [],
+    decisions: [],
+    failedAttempts: [],
+    lastNMessages: [],
+
+    toolCounts: {},
+    largeOutputs: [],
+
+    lastUserMessage: '',
+    lastAssistantPreview: '',
+    firstTs: null,
+    lastTs: null,
+  };
+
+  let turn = 0;
+  let prevInput = 0;
+
+  for (const entry of entries) {
+    const ts = Date.parse(entry.timestamp || '') || null;
+    if (ts) {
+      if (!analysis.firstTs) analysis.firstTs = ts;
+      analysis.lastTs = ts;
+    }
+
+    const usage = entry.usage || entry.message?.usage || {};
+    const inputTok    = usage.input_tokens || 0;
+    const outputTok   = usage.output_tokens || 0;
+    const cacheRead   = usage.cache_read_input_tokens || 0;
+    const cacheCreate = usage.cache_creation_input_tokens || 0;
+    const totalInput  = inputTok + cacheRead + cacheCreate;
+
+    if (totalInput > analysis.contextTokens) analysis.contextTokens = totalInput;
+    if (outputTok > 0) analysis.totalOutput += outputTok;
+
+    if (entry.type === 'user') {
+      analysis.userMessages++;
+      analysis.messageCount++;
+      turn++;
+      const text = extractText(entry.message?.content);
+      analysis.lastUserMessage = text.slice(0, 120);
+      if (text.length > 10) {
+        analysis.userIntents.push(text.slice(0, 120));
+        categorize(text, categories, analysis.activeCategories);
+        extractCritical(text, analysis.criticalBits);
+        if (prevInput > 0 && totalInput > prevInput) {
+          analysis.tokenPerTurn.push(totalInput - prevInput);
+        }
+        prevInput = totalInput;
+      }
+      analysis.tokenHistory.push({ turn, input: totalInput, output: 0 });
+    }
+
+    if (entry.type === 'assistant') {
+      analysis.assistantMessages++;
+      const text = extractText(entry.message?.content);
+      analysis.lastAssistantPreview = text.slice(0, 120);
+      if (text.length > 20) {
+        categorize(text, categories, analysis.activeCategories);
+        extractCritical(text, analysis.criticalBits);
+        if (/(?:karar|decided|seçtik|kullanacağız|yapacağız)/i.test(text)) {
+          analysis.decisions.push(text.slice(0, 150));
+        }
+        if (/(?:olmadı|çalışmadı|başarısız|denedik ama|bu yaklaşım)/i.test(text)) {
+          analysis.failedAttempts.push(text.slice(0, 100));
+        }
+      }
+      if (analysis.tokenHistory.length > 0) {
+        analysis.tokenHistory[analysis.tokenHistory.length - 1].output = outputTok;
+      }
+
+      const msgContent = entry.message?.content;
+      if (Array.isArray(msgContent)) {
+        for (const block of msgContent) {
+          if (block?.type === 'tool_use') recordToolUse(analysis, block.name, block.input);
+        }
+      }
+    }
+
+    if (entry.type === 'tool_use') {
+      recordToolUse(analysis, entry.tool || entry.name, entry.input);
+    }
+
+    if (entry.type === 'tool_result' || entry.type === 'user') {
+      const msgContent = entry.message?.content;
+      if (Array.isArray(msgContent)) {
+        for (const block of msgContent) {
+          if (block?.type === 'tool_result') {
+            const out = typeof block.content === 'string'
+              ? block.content
+              : JSON.stringify(block.content || '');
+            if (out.length > 2000) {
+              analysis.largeOutputs.push({
+                tool: 'tool_result',
+                size: out.length,
+                preview: out.slice(0, 100),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  analysis.lastNMessages = analysis.userIntents.slice(-5);
+
+  if (analysis.tokenPerTurn.length >= 3) {
+    const recent = analysis.tokenPerTurn.slice(-Math.min(growthWindow, analysis.tokenPerTurn.length));
+    analysis.avgGrowthPerTurn = Math.round(
+      recent.reduce((a, b) => a + b, 0) / recent.length
+    );
+  }
+
+  return analysis;
+}
+
+function recordToolUse(analysis, toolName, input) {
+  if (!toolName) return;
+  analysis.toolUses++;
+  analysis.toolCounts[toolName] = (analysis.toolCounts[toolName] || 0) + 1;
+  const inp = input || {};
+
+  if (['Write','write','Edit','edit','str_replace_based_edit_tool','MultiEdit'].includes(toolName)) {
+    const fp = inp.file_path || inp.path || inp.filename;
+    if (fp) analysis.filesModified.add(fp);
+  }
+  if (['bash','Bash'].includes(toolName) && inp.command) {
+    const cmd = String(inp.command).trim().slice(0, 80);
+    if (!analysis.bashCommands.includes(cmd)) analysis.bashCommands.push(cmd);
+  }
+}
+
+module.exports = {
+  analyzeEntries,
+  CRITICAL_PATTERNS,
+};

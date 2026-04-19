@@ -1,0 +1,43 @@
+{
+  "limits": {
+    "models": {
+      "claude-opus-4-7":   { "max": 1000000, "quality_ceiling": 200000 },
+      "claude-opus-4-6":   { "max": 200000,  "quality_ceiling": 200000 },
+      "claude-sonnet-4-6": { "max": 200000,  "quality_ceiling": 200000 },
+      "claude-sonnet-4-5": { "max": 200000,  "quality_ceiling": 200000 },
+      "claude-haiku-4-5":  { "max": 200000,  "quality_ceiling": 100000 },
+      "default":           { "max": 200000,  "quality_ceiling": 200000 }
+    },
+    "thresholds": {
+      "comfortable": 0.20,
+      "watch": 0.40,
+      "compact": 0.55,
+      "urgent": 0.75,
+      "critical": 0.90
+    },
+    "growth_window": 5,
+    "growth_warn": 5000,
+    "output_ratio_warn": 0.4
+  },
+  "watch": {
+    "interval_ms": 10000,
+    "macos_notifications": true,
+    "terminal_status": true
+  },
+  "categories": {
+    "schema":   { "words": ["schema","migration","drizzle","prisma","alter table","create table","pgtable","migrate"], "label": "DB/Schema" },
+    "api":      { "words": ["route","endpoint","fastify","express","handler","middleware","controller","router"],    "label": "API routes" },
+    "mobile":   { "words": ["screen","component","expo","react native","navigation","nativewind","stylesheet"],      "label": "Mobile/UI" },
+    "ai":       { "words": ["anthropic","openai","prompt","completion","stream","token","model","claude","gpt"],     "label": "AI integration" },
+    "auth":     { "words": ["jwt","auth","login","session","token","passport","guard","permission"],                 "label": "Auth/security" },
+    "bug":      { "words": ["hata","error","bug","fix","düzelt","çalışmıyor","undefined","null","exception","crash"],"label": "Bug fix" },
+    "refactor": { "words": ["refactor","yeniden","taşı","böl","rename","extract","split","move","reorganize"],       "label": "Refactoring" },
+    "infra":    { "words": ["deploy","docker","env","config","server","port","nginx","ssl","ci","cd","pipeline"],     "label": "Infra/DevOps" },
+    "test":     { "words": ["test","vitest","jest","spec","assert","expect","mock","coverage","playwright"],          "label": "Tests" },
+    "stripe":   { "words": ["stripe","payment","subscription","webhook","billing","iap","apple","google play"],       "label": "Payments" }
+  },
+  "snapshot": {
+    "memory_dir": "{project_dir}/memory",
+    "auto_index_update": true
+  }
+}

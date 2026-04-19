@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+'use strict';
+
+const { main } = require('../src/cli.js');
+const code = main(process.argv);
+if (typeof code === 'number') process.exitCode = code;

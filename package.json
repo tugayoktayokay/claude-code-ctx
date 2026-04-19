@@ -1,0 +1,16 @@
+{
+  "name": "ctx",
+  "version": "0.1.0",
+  "description": "Claude Code context manager — zero-dep JSONL analyzer, tailored /compact prompt builder, snapshot-to-memory bridge",
+  "bin": {
+    "ctx": "bin/ctx"
+  },
+  "scripts": {
+    "test": "node --test src/test/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
