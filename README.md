@@ -40,8 +40,8 @@ ctx --help
 Or from source:
 
 ```bash
-git clone https://github.com/tugayoktayokay/ctx.git ~/tools/ctx
-cd ~/tools/ctx
+git clone https://github.com/tugayoktayokay/claude-code-ctx.git ~/tools/claude-code-ctx
+cd ~/tools/claude-code-ctx
 npm link
 ctx --help
 ```

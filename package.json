@@ -1,6 +1,6 @@
 {
   "name": "claude-code-ctx",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Claude Code context manager — standalone zero-dep CLI that tracks session token usage against a model-aware quality ceiling, generates tailored /compact prompts, and bridges sessions to memory.",
   "bin": {
     "ctx": "bin/ctx"
@@ -23,12 +23,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tugayoktayokay/ctx.git"
+    "url": "git+https://github.com/tugayoktayokay/claude-code-ctx.git"
   },
   "bugs": {
-    "url": "https://github.com/tugayoktayokay/ctx/issues"
+    "url": "https://github.com/tugayoktayokay/claude-code-ctx/issues"
   },
-  "homepage": "https://github.com/tugayoktayokay/ctx#readme",
+  "homepage": "https://github.com/tugayoktayokay/claude-code-ctx#readme",
   "engines": {
     "node": ">=18"
   },
