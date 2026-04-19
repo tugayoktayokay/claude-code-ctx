@@ -10,6 +10,7 @@ const {
   handleSessionStart,
   handleStop,
   handlePreCompact,
+  handlePreToolUse,
   handlePostToolUse,
   handleUserPromptSubmit,
 } = require('../hooks.js');
@@ -214,6 +215,60 @@ test('user-prompt-submit: silent when warn_on empty and auto_retrieve disabled',
   cfg.hooks.user_prompt_submit.auto_retrieve = { enabled: false };
   const res = handleUserPromptSubmit({ cwd: '/tmp/x', prompt: 'hi' }, cfg);
   assert.equal(res.output, null);
+});
+
+test('pre-tool-use denies unbounded find from root with a reason', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: true,
+    default_mode: 'deny',
+    rules: [
+      { tool: 'Bash', match: '^\\s*find\\s+[/~]', reason: 'unbounded traversal' },
+    ],
+  };
+  const res = handlePreToolUse({ tool_name: 'Bash', tool_input: { command: 'find / -name test' } }, cfg);
+  assert.ok(res.output);
+  const out = res.output.hookSpecificOutput;
+  assert.equal(out.hookEventName, 'PreToolUse');
+  assert.equal(out.permissionDecision, 'deny');
+  assert.match(out.permissionDecisionReason, /unbounded traversal/);
+});
+
+test('pre-tool-use passes through when no rule matches', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: true,
+    default_mode: 'deny',
+    rules: [{ tool: 'Bash', match: '^\\s*find\\s+[/~]', reason: 'x' }],
+  };
+  const res = handlePreToolUse({ tool_name: 'Bash', tool_input: { command: 'ls -la /tmp' } }, cfg);
+  assert.equal(res.output, null);
+});
+
+test('pre-tool-use disabled returns null regardless of rules', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: false,
+    rules: [{ tool: 'Bash', match: '.*', reason: 'x' }],
+  };
+  const res = handlePreToolUse({ tool_name: 'Bash', tool_input: { command: 'anything' } }, cfg);
+  assert.equal(res.output, null);
+});
+
+test('pre-tool-use ask mode vs deny mode per rule', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: true,
+    default_mode: 'ask',
+    rules: [
+      { tool: 'Bash', match: '^\\s*ls\\s+-R', reason: 'recursive', mode: 'deny' },
+      { tool: 'Bash', match: '^\\s*tree',       reason: 'deep tree' },
+    ],
+  };
+  const deny = handlePreToolUse({ tool_name: 'Bash', tool_input: { command: 'ls -R /' } }, cfg);
+  assert.equal(deny.output.hookSpecificOutput.permissionDecision, 'deny');
+  const ask  = handlePreToolUse({ tool_name: 'Bash', tool_input: { command: 'tree' } }, cfg);
+  assert.equal(ask.output.hookSpecificOutput.permissionDecision, 'ask');
 });
 
 test('user-prompt-submit warn_on heavy injects tool-size summary with hint', () => {

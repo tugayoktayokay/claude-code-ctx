@@ -21,6 +21,10 @@ const CTX_HOOK_EVENTS = {
     command: 'ctx hook pre-compact',
     matcher: null,
   },
+  PreToolUse: {
+    command: 'ctx hook pre-tool-use',
+    matcher: 'Bash',
+  },
   PostToolUse: {
     command: 'ctx hook post-tool-use',
     matcher: 'Bash',

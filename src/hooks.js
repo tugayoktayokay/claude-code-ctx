@@ -154,6 +154,45 @@ function handlePreCompact(input, config) {
   };
 }
 
+function handlePreToolUse(input, config) {
+  const pre = config?.hooks?.pre_tool_use;
+  if (!pre?.enabled) return { output: null, exitCode: 0 };
+
+  const toolName  = input.tool_name;
+  const toolInput = input.tool_input || {};
+  const cmd       = toolInput.command || '';
+
+  const rules = pre.rules || [];
+  for (const rule of rules) {
+    if (rule.tool && rule.tool !== toolName) continue;
+    const probe = rule.field === 'file_path' ? (toolInput.file_path || toolInput.path || '')
+                : rule.field === 'pattern'   ? (toolInput.pattern || '')
+                : cmd;
+    try {
+      const re = new RegExp(rule.match);
+      if (!re.test(probe)) continue;
+    } catch { continue; }
+
+    const mode = rule.mode || pre.default_mode || 'ask';
+    const action = mode === 'deny' ? 'deny' : mode === 'allow' ? 'allow' : 'ask';
+    const reason = rule.reason || 'ctx: likely to produce heavy output — consider narrower scope';
+
+    logHook(config, `pre-tool-use ${action} tool=${toolName} rule="${rule.match}" reason="${reason}"`);
+
+    return {
+      output: {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: action,
+          permissionDecisionReason: `[ctx] ${reason}`,
+        },
+      },
+      exitCode: 0,
+    };
+  }
+  return { output: null, exitCode: 0 };
+}
+
 async function handlePostToolUse(input, config) {
   const triggers = config?.hooks?.post_tool_use?.triggers || [];
   if (!triggers.length) return { output: null, exitCode: 0 };
@@ -276,6 +315,7 @@ async function handle(eventName, input, config) {
     case 'session-start':      return handleSessionStart(input, config);
     case 'stop':               return handleStop(input, config);
     case 'pre-compact':        return handlePreCompact(input, config);
+    case 'pre-tool-use':       return handlePreToolUse(input, config);
     case 'post-tool-use':      return handlePostToolUse(input, config);
     case 'user-prompt-submit': return handleUserPromptSubmit(input, config);
     default:
@@ -308,6 +348,7 @@ module.exports = {
   handleSessionStart,
   handleStop,
   handlePreCompact,
+  handlePreToolUse,
   handlePostToolUse,
   handleUserPromptSubmit,
   runHookCli,
