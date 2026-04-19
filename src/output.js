@@ -159,6 +159,45 @@ function printHistory(rows) {
   console.log('');
 }
 
+function printRetrieval(results, query, opts = {}) {
+  if (opts.json) {
+    process.stdout.write(JSON.stringify({
+      query: query.raw,
+      tokens: query.nonStop,
+      categories: query.categories,
+      results: results.map(r => ({
+        score: +r.score.toFixed(3),
+        breakdown: r.breakdown,
+        name: r.snapshot.name,
+        path: r.snapshot.path,
+        categories: r.snapshot.categories,
+      })),
+    }, null, 2) + '\n');
+    return;
+  }
+  console.log('');
+  console.log(C.bold + `  ctx ask — "${query.raw}"` + C.reset);
+  console.log(C.dim + `    query tokens: ${query.nonStop.join(' ')} | categories: ${query.categories.join(', ') || '(none)'}` + C.reset);
+  console.log('');
+  if (!results.length) {
+    console.log(C.gray + '  No matches above min_score.' + C.reset);
+    console.log('');
+    return;
+  }
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const b = r.breakdown;
+    const age = timeAgo(r.snapshot.mtime);
+    console.log(`  ${C.bold}#${i + 1}${C.reset}  ${C.green}score ${r.score.toFixed(2)}${C.reset}  ${r.snapshot.name}`);
+    console.log(`      ${C.gray}matched: category=${b.category.toFixed(2)} keyword=${b.keyword.toFixed(2)} recency=${b.recency.toFixed(2)}${C.reset}`);
+    console.log(`      ${C.gray}cats: ${(r.snapshot.categories || []).join(', ') || '(none)'} | ${age}${C.reset}`);
+    const firstBody = (r.snapshot.body || '').split('\n').filter(l => l.trim()).slice(0, 3).join(' ').slice(0, 140);
+    if (firstBody) console.log(`      ${firstBody}`);
+    console.log(C.dim + `      ${r.snapshot.path}` + C.reset);
+    console.log('');
+  }
+}
+
 function timeAgo(ms) {
   const diff = Date.now() - ms;
   const m = Math.round(diff / 60000);
@@ -193,6 +232,7 @@ module.exports = {
   printWatchTick,
   printSnapshotResult,
   printHistory,
+  printRetrieval,
   timeAgo,
   macNotify,
 };
