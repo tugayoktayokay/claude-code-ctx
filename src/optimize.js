@@ -71,10 +71,12 @@ function scanSkills() {
         const raw = safeRead(full, 64 * 1024) || '';
         const nameLine = raw.match(/^name:\s*(.+)$/m);
         const descLine = raw.match(/^description:\s*(.+)$/m);
+        const description = descLine ? descLine[1].trim() : '';
         out.push({
           path: full,
           name: nameLine ? nameLine[1].trim() : path.basename(path.dirname(full)),
-          description: descLine ? descLine[1].trim().slice(0, 120) : '',
+          description: description.slice(0, 120),
+          descBytes: description.length + 20,
           bytes: stat.size,
         });
       }
@@ -82,6 +84,24 @@ function scanSkills() {
   }
   for (const r of roots) walk(r);
   return out.sort((a, b) => b.bytes - a.bytes);
+}
+
+function findUnusedSkills({ scanThresholdDays = 30 } = {}) {
+  const installed = scanSkills();
+  const since = Date.now() - scanThresholdDays * 86_400_000;
+  const sessions = listAllSessions().filter(s => s.mtime >= since);
+  const usage = aggregateSkillUsage(sessions);
+  const bareOf = (k) => (k && k.includes(':')) ? k.split(':').pop() : k;
+  const used = new Set(usage.ranked.map(r => r.name));
+  const usedBare = new Set(usage.ranked.map(r => bareOf(r.name)));
+  const unused = [];
+  for (const s of installed) {
+    const key = s.name;
+    const bareKey = bareOf(key);
+    if (used.has(key) || usedBare.has(bareKey) || used.has(bareKey)) continue;
+    unused.push(s);
+  }
+  return { installed, unused, sessionsScanned: sessions.length, usage: usage.ranked };
 }
 
 function aggregateToolUsage(sessions, { sinceMs = 0 } = {}) {
@@ -150,6 +170,7 @@ module.exports = {
   splitSections,
   scanClaudeMd,
   scanSkills,
+  findUnusedSkills,
   aggregateToolUsage,
   aggregateSkillUsage,
   topHeavyOutputs,

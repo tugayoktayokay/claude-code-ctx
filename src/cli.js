@@ -430,14 +430,21 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
-function runBloat(_args, _config) {
+function runBloat(args, _config) {
   stripColor();
   const cwd = process.cwd();
-  const { scanClaudeMd, scanSkills } = require('./optimize.js');
+  let days = 30;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--days' && args[i + 1]) { days = Number(args[i + 1]); i++; }
+  }
+  const { scanClaudeMd, findUnusedSkills } = require('./optimize.js');
   const { printBloat } = require('./output.js');
+  const unused = findUnusedSkills({ scanThresholdDays: days });
   printBloat({
     claudeMd: scanClaudeMd(cwd),
-    skills:   scanSkills(),
+    skills: unused.installed,
+    unusedSkills: unused.unused,
+    scanThresholdDays: days,
   });
   return 0;
 }

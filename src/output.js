@@ -253,6 +253,7 @@ function printBloat(report) {
   console.log('');
   console.log(C.bold + '  ctx bloat — system prompt footprint' + C.reset);
   console.log('');
+  console.log(C.dim + '  CLAUDE.md files (every-turn cost):' + C.reset);
   let total = 0;
   for (const cmd of report.claudeMd) {
     total += cmd.bytes;
@@ -264,18 +265,27 @@ function printBloat(report) {
   }
   if (!report.claudeMd.length) console.log(C.gray + '  (no CLAUDE.md found)' + C.reset);
   console.log('');
-  console.log(C.bold + '  Skills (SKILL.md files on disk):' + C.reset);
-  let skillBytes = 0;
-  for (const s of report.skills.slice(0, 10)) {
-    skillBytes += s.bytes;
-    console.log(`    ${C.gray}${s.name.padEnd(40)}${C.reset} ${fmtBytesShort(s.bytes).padStart(6)}  ${C.dim}${s.description.slice(0, 60)}${C.reset}`);
-  }
-  if (report.skills.length > 10) {
-    console.log(C.gray + `    … and ${report.skills.length - 10} more` + C.reset);
-  }
+
+  console.log(C.dim + '  Skills — description line is the per-session cost (body lazy-loaded):' + C.reset);
+  console.log(C.gray + `    ${report.skills.length} total installed` + C.reset);
+  const totalDescBytes = report.skills.reduce((a, s) => a + (s.descBytes || 0), 0);
+  console.log(C.gray + `    ~${fmtBytesShort(totalDescBytes)} description lines in system-reminder each session` + C.reset);
   console.log('');
-  console.log(`  ${C.dim}CLAUDE.md total:${C.reset} ${fmtBytesShort(total)}   ${C.dim}Skills (top 10):${C.reset} ${fmtBytesShort(skillBytes)}`);
-  console.log('');
+
+  if (report.unusedSkills && report.unusedSkills.length) {
+    console.log(C.yellow + `  ⚠ ${report.unusedSkills.length} skill(s) not invoked in last ${report.scanThresholdDays || 30}d:` + C.reset);
+    let unusedDescBytes = 0;
+    for (const s of report.unusedSkills.slice(0, 15)) {
+      unusedDescBytes += s.descBytes || 0;
+      console.log(`    ${C.gray}${s.name.padEnd(38)}${C.reset} desc ${fmtBytesShort(s.descBytes || 0).padStart(5)}  body ${fmtBytesShort(s.bytes).padStart(6)}`);
+    }
+    if (report.unusedSkills.length > 15) {
+      console.log(C.gray + `    … and ${report.unusedSkills.length - 15} more` + C.reset);
+    }
+    console.log('');
+    console.log(C.green + `    → removing these unused skills saves ~${fmtBytesShort(unusedDescBytes)} per session` + C.reset);
+    console.log('');
+  }
 }
 
 function printUsage(title, ranked, meta) {

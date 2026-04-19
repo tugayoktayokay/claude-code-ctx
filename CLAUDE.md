@@ -26,48 +26,21 @@ These are load-bearing promises of the project, not style preferences:
 
 ## Architecture
 
-Data flows one direction through pure-ish modules; `cli.js` is the only orchestrator. Daemon + CLI + hooks all go through `pipeline.runAnalyze` — it is the single entry point from "I have a cwd" to "I have analysis/decision/strategy".
+One-way data flow; `cli.js` dispatches, `pipeline.runAnalyze` is the single entry to the analysis/decision/strategy bundle. Module map: `session → analyzer → decision/strategy/snapshot` (core), plus orthogonal modules for `backup`, `prune`, `hooks`/`hooks_install`, memory engine (`query`, `retrieval`, `notes`, `timeline`, `diff`, `stats`), `watcher`/`daemon`, `output`, `config`. One file = one responsibility; run `ls src/` for the current list.
 
-```
-bin/ctx → src/cli.js
-           │
-           ├── session.js       read ~/.claude/projects/<encoded-cwd>/*.jsonl → entries[]
-           ├── analyzer.js      entries → stats (tokens, files, categories, decisions, failed attempts)
-           ├── models.js        detectModel(entries) + getLimits(modelId, config)
-           ├── decision.js      stats + limits → { level, action, reasons, metrics }
-           ├── strategy.js      analysis + decision → { keep, drop, compactPrompt }
-           ├── pipeline.js      runAnalyze({cwd|sessionPath|sessionId|entries, config})
-           ├── snapshot.js      markdown + frontmatter (parent, categories, fingerprint, trigger)
-           ├── query.js         query → {tokens, nonStop, categories}        ← memory engine
-           ├── retrieval.js     collect + score + rank snapshots              ← memory engine
-           ├── notes.js         user markdown roots walk (.md only, exclude)  ← memory engine
-           ├── timeline.js      parent-chain traversal, thread grouping       ← memory engine
-           ├── diff.js          snapshot facts delta (files/decisions/failed) ← memory engine
-           ├── stats.js         trigger + category aggregation                ← memory engine
-           ├── backup.js        stream gzip JSONL + rotate + restore
-           ├── prune.js         memory dir planPrune/applyPrune
-           ├── hooks.js         Claude Code hook handlers (incl. auto-retrieve)
-           ├── hooks_install.js merge/unmerge ctx entries in settings.json (source: "ctx" tag)
-           ├── watcher.js       foreground live loop
-           ├── daemon.js        background loop + optional auto-snapshot/backup
-           ├── output.js        ANSI formatting + osascript notifier
-           └── config.js        config.default.json ← deepMerge ← ~/.config/ctx/config.json
-```
+Non-obvious boundaries that matter for changes:
 
-Key boundaries:
-
-- **`session.js` owns filesystem layout.** `encodeCwd()` turns `/Users/x/proj` into `-Users-x-proj` (matches Claude Code's own encoding). Nothing else should compute that path — `backup.js` and `snapshot.js` reuse it.
-- **`analyzer.js` is the single source of truth for what a session "is".** Token counting takes the max of `input + cache_read + cache_creation` across entries (not the sum) — the last turn already includes cache. Do not change this without updating tests.
-- **`decision.js` thresholds fire against `quality_ceiling`, not `max`.** Opus 4.7's `max` is 1M but its ceiling is 200k. This distinction is the whole point of the tool.
-- **`strategy.js` generates the `/compact` prompt.** Shape: `/compact focus on <top-3-categories> — keep: <files/decisions/signals> — drop: <noise> — continue: "<last user intent>"`. Tests pin this format.
-- **`snapshot.js` writes to the user's Claude Code memory dir** (`~/.claude/projects/<encoded-cwd>/memory/`). Each file gets frontmatter (`name`/`description`/`type`/`trigger`/`fingerprint`). Dedup reads `fingerprint:` from the last 3 snapshots — same fingerprint = skip write. Hand-written MEMORY.md lines are preserved by `rewriteIndex`.
-- **`hooks.js` is stateless, non-blocking, and silent.** Handlers read JSON stdin, write JSON/empty stdout, log errors to `~/.config/ctx/hooks.log`, and always exit 0. `pipeline.runAnalyze` and `snapshot.writeSnapshot` are reached via `require('./pipeline.js').runAnalyze` (not destructured) so tests can swap them.
-- **`hooks_install.js` tags every entry it writes with `source: "ctx"` and `ctxSchemaVersion: 1`.** Uninstall matches on that tag, never on command string — a user who renames their binary keeps working.
-- **`daemon.js` state lives in `~/.config/ctx/`**: `daemon.pid`, `daemon.log`, `daemon.state.json`. Notifications are deduped by a 10-minute window in `state.notifiedAt`. Auto-snapshot/auto-backup are off by default (`daemon.auto_snapshot_on: []`) because hooks cover the primary path; daemon is the safety net for sessions outside Claude Code. The `__run__` subcommand is the detached child entrypoint — not a public command.
-- **`backup.js` streams gzip (never reads whole JSONL into memory).** Rotation is per-cwd by `keep_last`. Restore paths are prefix-matched; ambiguity throws rather than picking arbitrarily.
-- **Memory engine modules (`query.js`, `retrieval.js`, `notes.js`, `timeline.js`, `diff.js`, `stats.js`) are pure functions with zero external state.** They read from disk and return plain data. Never write, never call hooks, never touch the daemon. This makes them trivially testable and safe to compose.
-- **`retrieval.readSnapshotHead` is the only canonical frontmatter parser.** If you need to read a snapshot's metadata from another module (timeline, stats, diff), import this function — don't re-implement parsing.
-- **Auto-retrieval respects user privacy boundaries:** default scopes are `["project", "global"]` — memory dirs only. `notes.roots` are never auto-injected; they require an explicit `--notes` flag on `ctx ask`.
+- **`session.encodeCwd`** is the only encoder for `~/.claude/projects/<cwd>/` path. `backup.js` and `snapshot.js` reuse it — don't invent new ones.
+- **`analyzer.js` token counting** takes the `max` of `input + cache_read + cache_creation` across entries (not the sum; last turn already contains cache). Don't change without updating tests.
+- **`decision.js` thresholds fire against `quality_ceiling`, not `max`.** Opus 4.7 max=1M, ceiling=200k. This distinction is the whole point.
+- **`strategy.js::compactPrompt` shape is pinned by tests:** `/compact focus on <cats> — keep: <...> — drop: <...> — continue: "<intent>"`.
+- **`snapshot.js` frontmatter contract:** `name`/`trigger`/`fingerprint`/`categories`/`parent`. Dedup reads fingerprint from last 3 snapshots. Hand-written MEMORY.md lines are preserved by `rewriteIndex` (line matches `^- \[project_...\](...)`).
+- **`hooks.js` is stateless + non-blocking:** always exit 0, log errors to `~/.config/ctx/hooks.log`. Internal modules are reached via `pipeline.runAnalyze(...)` not destructured — tests need to swap them.
+- **`hooks_install.js` tags with `source: "ctx"`** and matches on that tag for uninstall. Foreign user hooks are preserved. Install command path comes from `resolveCtxCommand()` (process.argv[1]) — survives nvm/custom PATH.
+- **`backup.js` uses copyFileSync → gzip → atomic rename** (not live stream copy) so an actively-appended JSONL doesn't produce a truncated backup.
+- **Memory engine modules (`query`/`retrieval`/`notes`/`timeline`/`diff`/`stats`/`optimize`)** are pure: read disk, return plain data. `retrieval.readSnapshotHead` is the only canonical frontmatter parser — reuse it.
+- **`notes.roots` never auto-injects.** Auto-retrieval scope defaults `["project", "global"]` — memory dirs only. `--notes` is explicit-opt-in via `ctx ask`.
+- **`daemon.js` auto-snapshot/backup default off** (`auto_snapshot_on: []`). Hooks cover the primary path; daemon is the fallback for sessions outside Claude Code.
 
 ## Config
 
