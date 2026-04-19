@@ -67,12 +67,59 @@ function collectProjectCandidates(memoryDir, config) {
   return out;
 }
 
+function stemLite(word) {
+  if (!word || word.length < 4) return word;
+  const suffixes = ['ing', 'ed', 'ies', 'es', 's', 'ly', 'er', 'est', 'lerin', 'ların', 'ları', 'leri', 'lar', 'ler', 'nin', 'nın', 'un', 'ün'];
+  for (const suf of suffixes) {
+    if (word.length > suf.length + 2 && word.endsWith(suf)) {
+      return word.slice(0, -suf.length);
+    }
+  }
+  return word;
+}
+
 function tokenizeBody(body) {
   if (!body) return [];
   return body
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
-    .filter(t => t.length > 1 && t.length < 40);
+    .filter(t => t.length > 1 && t.length < 40)
+    .map(stemLite);
+}
+
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const prev = new Array(b.length + 1);
+  const curr = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+  return prev[b.length];
+}
+
+function fuzzyMatch(term, vocabulary, maxDist = 2) {
+  if (!term || term.length < 4) return null;
+  let best = null;
+  let bestDist = maxDist + 1;
+  for (const v of vocabulary) {
+    if (Math.abs(v.length - term.length) > maxDist) continue;
+    const d = levenshtein(term, v);
+    if (d < bestDist) {
+      bestDist = d;
+      best = v;
+      if (d === 1) break;
+    }
+  }
+  return bestDist <= maxDist ? { term: best, dist: bestDist } : null;
 }
 
 function buildCorpusStats(candidates) {
@@ -86,10 +133,11 @@ function buildCorpusStats(candidates) {
     for (const term of unique) df.set(term, (df.get(term) || 0) + 1);
   }
   const avgDL = totalLen / N || 1;
-  return { N, df, avgDL };
+  const _vocab = [...df.keys()];
+  return { N, df, avgDL, _vocab };
 }
 
-function bm25Score(queryTerms, snap, corpus, { k1 = 1.5, b = 0.75 } = {}) {
+function bm25Score(queryTerms, snap, corpus, { k1 = 1.5, b = 0.75, enableFuzzy = true } = {}) {
   if (!queryTerms.length) return 0;
   if (!snap._terms) snap._terms = tokenizeBody(snap.body);
   const tf = new Map();
@@ -97,14 +145,23 @@ function bm25Score(queryTerms, snap, corpus, { k1 = 1.5, b = 0.75 } = {}) {
   const dl = snap._terms.length || 1;
 
   let score = 0;
-  for (const q of queryTerms) {
-    const f = tf.get(q) || 0;
+  for (let q of queryTerms) {
+    q = stemLite(q);
+    let f = tf.get(q) || 0;
+    let fuzzyPenalty = 1;
+    if (!f && enableFuzzy && corpus._vocab) {
+      const fm = fuzzyMatch(q, corpus._vocab);
+      if (fm) {
+        f = tf.get(fm.term) || 0;
+        fuzzyPenalty = fm.dist === 1 ? 0.7 : 0.45;
+      }
+    }
     if (!f) continue;
-    const n = corpus.df.get(q) || 0;
+    const n = corpus.df.get(q) || corpus.df.get(queryTerms[0]) || 0;
     const idf = Math.log(1 + (corpus.N - n + 0.5) / (n + 0.5));
     const numerator = f * (k1 + 1);
     const denominator = f + k1 * (1 - b + b * (dl / corpus.avgDL));
-    score += idf * (numerator / denominator);
+    score += fuzzyPenalty * idf * (numerator / denominator);
   }
   return score;
 }
@@ -188,5 +245,8 @@ module.exports = {
   bm25Score,
   buildCorpusStats,
   tokenizeBody,
+  stemLite,
+  levenshtein,
+  fuzzyMatch,
   rank,
 };

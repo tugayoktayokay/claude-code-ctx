@@ -64,6 +64,9 @@ Analysis + memory:
   ctx heavy [jsonl-path]             Largest tool outputs in current session
   ctx statusline                     One-line status for Claude Code statusline hook
   ctx report [--out PATH] [--days N] Generate self-contained HTML report
+  ctx doctor                         Runtime health check (hooks, config, daemon, binary path)
+  ctx purge [--apply]                Delete all memory + backups for this project (dry run by default)
+  ctx upgrade                        git pull latest in the source checkout
   ctx restore --list                 List gzipped JSONL backups for this project
   ctx restore <session-id> [--to P]  Gunzip backup to stdout or file
   ctx config                         Show / create config file
@@ -432,6 +435,67 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runDoctor(_args, _config) {
+  stripColor();
+  const { runChecks } = require('./doctor.js');
+  const { printDoctor } = require('./output.js');
+  const results = runChecks({ cwdBinary: process.argv[1] });
+  printDoctor(results);
+  const hasFail = results.some(r => r.level === 'fail');
+  return hasFail ? 1 : 0;
+}
+
+function runPurge(args, config) {
+  stripColor();
+  const cwd = process.cwd();
+  const apply = args.includes('--apply');
+  const { resolveMemoryDir } = require('./snapshot.js');
+  const backup = require('./backup.js');
+  const memoryDir = resolveMemoryDir(cwd, config);
+  const backupDir = backup.backupDir(cwd, config);
+
+  console.log('');
+  console.log(C.bold + '  ctx purge — permanent delete of local ctx data for this project' + C.reset);
+  console.log('');
+  console.log(C.gray + `    memory:  ${memoryDir}` + C.reset);
+  console.log(C.gray + `    backups: ${backupDir}` + C.reset);
+  console.log('');
+  if (!apply) {
+    console.log(C.yellow + '  Dry run. Use --apply to actually delete.' + C.reset);
+    console.log('');
+    return 0;
+  }
+  let mem = 0, bkp = 0;
+  try { mem = fs.readdirSync(memoryDir).length; } catch {}
+  try { bkp = fs.readdirSync(backupDir).length; } catch {}
+  try { fs.rmSync(memoryDir, { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(backupDir, { recursive: true, force: true }); } catch {}
+  console.log(C.green + `  ✓ purged ${mem} memory file(s) + ${bkp} backup(s).` + C.reset);
+  console.log('');
+  return 0;
+}
+
+function runUpgrade(args, config) {
+  stripColor();
+  const { execFileSync } = require('child_process');
+  const repoDir = path.resolve(__dirname, '..');
+  console.log('');
+  console.log(C.bold + `  ctx upgrade — pulling latest in ${repoDir}` + C.reset);
+  console.log('');
+  try {
+    const out = execFileSync('git', ['-C', repoDir, 'pull', '--ff-only'], { stdio: 'pipe' }).toString();
+    console.log(out.trim());
+  } catch (err) {
+    console.error(C.red + `  ✗ git pull failed: ${err.message.split('\n')[0]}` + C.reset);
+    return 1;
+  }
+  console.log('');
+  console.log(C.green + '  ✓ ctx source updated. Hook commands pointing to this checkout will pick it up on next invocation.' + C.reset);
+  console.log(C.dim + '  If you use npm-installed version instead, run:  npm install -g claude-code-ctx@latest' + C.reset);
+  console.log('');
+  return 0;
+}
+
 function runStatusline(_args, config) {
   const cwd = process.cwd();
   let pipe;
@@ -792,6 +856,12 @@ function main(argv) {
       return runStatusline(rest, config);
     case 'report':
       return runReport(rest, config);
+    case 'doctor':
+      return runDoctor(rest, config);
+    case 'purge':
+      return runPurge(rest, config);
+    case 'upgrade':
+      return runUpgrade(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':

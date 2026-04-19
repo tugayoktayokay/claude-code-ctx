@@ -252,9 +252,32 @@ module.exports = {
   printBloat,
   printUsage,
   printHeavy,
+  printDoctor,
   timeAgo,
   macNotify,
 };
+
+function printDoctor(results) {
+  console.log('');
+  console.log(C.bold + '  ctx doctor — health check' + C.reset);
+  console.log('');
+  let fails = 0, warns = 0;
+  for (const r of results) {
+    if (r.level === 'fail') fails++;
+    if (r.level === 'warn') warns++;
+    const color = r.level === 'fail' ? C.red : r.level === 'warn' ? C.yellow : r.level === 'info' ? C.gray : C.green;
+    console.log(`  ${color}${r.icon}${C.reset} ${C.bold}${r.label.padEnd(22)}${C.reset} ${C.gray}${r.detail}${C.reset}`);
+  }
+  console.log('');
+  if (fails) {
+    console.log(C.red + `  ${fails} failure(s) — needs attention` + C.reset);
+  } else if (warns) {
+    console.log(C.yellow + `  ${warns} warning(s) — review above` + C.reset);
+  } else {
+    console.log(C.green + '  ✓ all checks passed' + C.reset);
+  }
+  console.log('');
+}
 
 function fmtBytesShort(n) {
   if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + 'M';

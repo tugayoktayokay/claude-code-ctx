@@ -47,6 +47,22 @@ test('scoreSnapshot combines category + keyword + recency', () => {
   assert.ok(r.breakdown.recency > 0.5, 'recent decays slowly');
 });
 
+test('stemLite strips common english + turkish suffixes', () => {
+  const { stemLite } = require('../retrieval.js');
+  assert.equal(stemLite('webhooks'), 'webhook');
+  assert.equal(stemLite('running'), 'runn');
+  assert.equal(stemLite('stripe'), 'stripe');
+  assert.equal(stemLite('kararların'), 'karar');
+});
+
+test('fuzzyMatch catches typos within edit distance 2', () => {
+  const { fuzzyMatch } = require('../retrieval.js');
+  const vocab = ['webhook', 'kubernetes', 'authentication', 'stripe'];
+  assert.equal(fuzzyMatch('wehbook', vocab).term, 'webhook');
+  assert.equal(fuzzyMatch('kuberntes', vocab).term, 'kubernetes');
+  assert.equal(fuzzyMatch('xyz', vocab), null);
+});
+
 test('bm25Score rewards rare terms more than common terms', () => {
   const { bm25Score, buildCorpusStats, tokenizeBody } = require('../retrieval.js');
   const candidates = [
