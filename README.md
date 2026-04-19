@@ -33,7 +33,7 @@ Existing tooling doesn't surface this:
 ## Install
 
 ```bash
-npm install -g claude-ctx
+npm install -g @tugayoktayokay/claude-ctx
 ctx --help
 ```
 
@@ -48,7 +48,7 @@ ctx --help
 
 Requires Node 18+. No transitive dependencies — the package has nothing in `dependencies` or `devDependencies`.
 
-> The npm package is named `claude-ctx` (the bare `ctx` name was taken by an unrelated package). The CLI command you run stays `ctx`.
+> The CLI command is `ctx`. The npm package is scoped (`@tugayoktayokay/claude-ctx`) because the bare `ctx` and `claude-ctx` names were taken by unrelated packages.
 
 ---
 
