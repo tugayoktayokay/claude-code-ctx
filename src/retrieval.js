@@ -67,8 +67,50 @@ function collectProjectCandidates(memoryDir, config) {
   return out;
 }
 
-function scoreSnapshot(query, snap, config) {
-  const weights = config?.retrieval?.weights || { category: 0.5, keyword: 0.3, recency: 0.2 };
+function tokenizeBody(body) {
+  if (!body) return [];
+  return body
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(t => t.length > 1 && t.length < 40);
+}
+
+function buildCorpusStats(candidates) {
+  const N = candidates.length || 1;
+  const df = new Map();
+  let totalLen = 0;
+  for (const c of candidates) {
+    if (!c._terms) c._terms = tokenizeBody(c.body);
+    totalLen += c._terms.length;
+    const unique = new Set(c._terms);
+    for (const term of unique) df.set(term, (df.get(term) || 0) + 1);
+  }
+  const avgDL = totalLen / N || 1;
+  return { N, df, avgDL };
+}
+
+function bm25Score(queryTerms, snap, corpus, { k1 = 1.5, b = 0.75 } = {}) {
+  if (!queryTerms.length) return 0;
+  if (!snap._terms) snap._terms = tokenizeBody(snap.body);
+  const tf = new Map();
+  for (const t of snap._terms) tf.set(t, (tf.get(t) || 0) + 1);
+  const dl = snap._terms.length || 1;
+
+  let score = 0;
+  for (const q of queryTerms) {
+    const f = tf.get(q) || 0;
+    if (!f) continue;
+    const n = corpus.df.get(q) || 0;
+    const idf = Math.log(1 + (corpus.N - n + 0.5) / (n + 0.5));
+    const numerator = f * (k1 + 1);
+    const denominator = f + k1 * (1 - b + b * (dl / corpus.avgDL));
+    score += idf * (numerator / denominator);
+  }
+  return score;
+}
+
+function scoreSnapshot(query, snap, config, corpus) {
+  const weights = config?.retrieval?.weights || { category: 0.4, bm25: 0.4, recency: 0.2 };
   const halfLife = config?.retrieval?.recency_half_life_days || 90;
 
   const qCats = new Set(query.categories);
@@ -77,8 +119,11 @@ function scoreSnapshot(query, snap, config) {
   for (const c of qCats) if (sCats.has(c)) inter++;
   const categoryScore = qCats.size === 0 ? 0 : inter / qCats.size;
 
-  let keywordScore = 0;
-  if (query.nonStop.length) {
+  let bm25 = 0;
+  if (corpus && query.nonStop.length) {
+    bm25 = bm25Score(query.nonStop, snap, corpus);
+    bm25 = bm25 / (bm25 + 5);
+  } else if (query.nonStop.length) {
     const lower = (snap.body || '').toLowerCase();
     let total = 0;
     for (const term of query.nonStop) {
@@ -86,28 +131,30 @@ function scoreSnapshot(query, snap, config) {
       const matches = lower.match(re);
       if (matches) total += matches.length;
     }
-    keywordScore = Math.min(total / Math.sqrt(Math.max(snap.length, 1)), 1.0);
+    bm25 = Math.min(total / Math.sqrt(Math.max(snap.length, 1)), 1.0);
   }
 
   const days = Math.max(0, (Date.now() - (snap.mtime || Date.now())) / 86_400_000);
   const recencyScore = Math.pow(2, -days / halfLife);
 
-  const total = weights.category * categoryScore
-              + weights.keyword  * keywordScore
-              + weights.recency  * recencyScore;
+  const keywordWeight = weights.bm25 ?? weights.keyword ?? 0.3;
+  const total = (weights.category ?? 0.4) * categoryScore
+              + keywordWeight * bm25
+              + (weights.recency ?? 0.2) * recencyScore;
 
   return {
     total,
-    breakdown: { category: categoryScore, keyword: keywordScore, recency: recencyScore },
+    breakdown: { category: categoryScore, keyword: bm25, recency: recencyScore },
   };
 }
 
 function rank(query, candidates, config) {
   const minScore = config?.retrieval?.min_score ?? 0.15;
   const topN     = config?.retrieval?.top_n     ?? 3;
+  const corpus   = candidates.length ? buildCorpusStats(candidates) : null;
   const scored = [];
   for (const c of candidates) {
-    const s = scoreSnapshot(query, c, config);
+    const s = scoreSnapshot(query, c, config, corpus);
     if (s.total < minScore) continue;
     scored.push({ snapshot: c, score: s.total, breakdown: s.breakdown });
   }
@@ -138,5 +185,8 @@ module.exports = {
   collectProjectCandidates,
   collectAllProjectsCandidates,
   scoreSnapshot,
+  bm25Score,
+  buildCorpusStats,
+  tokenizeBody,
   rank,
 };

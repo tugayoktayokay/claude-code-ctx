@@ -212,10 +212,37 @@ function updateIndex(indexPath, relFile, description) {
   return true;
 }
 
+function redactPrivate(analysis) {
+  const re = /<private>[\s\S]*?<\/private>|\[ctx:private\][\s\S]*?\[\/ctx:private\]/gi;
+  const strip = (s) => typeof s === 'string' ? s.replace(re, '[redacted]') : s;
+  analysis.lastUserMessage   = strip(analysis.lastUserMessage);
+  analysis.lastAssistantPreview = strip(analysis.lastAssistantPreview);
+  if (Array.isArray(analysis.userIntents)) {
+    analysis.userIntents = analysis.userIntents.map(strip);
+  }
+  if (Array.isArray(analysis.lastNMessages)) {
+    analysis.lastNMessages = analysis.lastNMessages.map(strip);
+  }
+  if (Array.isArray(analysis.decisions)) {
+    analysis.decisions = analysis.decisions.map(strip);
+  }
+  if (Array.isArray(analysis.failedAttempts)) {
+    analysis.failedAttempts = analysis.failedAttempts.map(strip);
+  }
+  if (Array.isArray(analysis.criticalBits)) {
+    analysis.criticalBits = analysis.criticalBits.map(b => ({ ...b, text: strip(b.text) }));
+  }
+  return analysis;
+}
+
 function writeSnapshot(analysis, decision, strategy, options) {
   const { cwd, config, customName, sessionId, modelId, trigger } = options;
   const memoryDir = resolveMemoryDir(cwd, config);
   fs.mkdirSync(memoryDir, { recursive: true });
+
+  if (options.redactPrivate !== false) {
+    redactPrivate(analysis);
+  }
 
   const fingerprint = computeFingerprint(analysis, decision);
 
@@ -305,4 +332,5 @@ module.exports = {
   computeFingerprint,
   readRecentFingerprints,
   getLatestSnapshotForCwd,
+  redactPrivate,
 };

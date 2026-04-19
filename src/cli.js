@@ -62,6 +62,8 @@ Analysis + memory:
   ctx usage [--tools|--skills] [--days 30]
                                      Aggregate tool/skill usage across sessions
   ctx heavy [jsonl-path]             Largest tool outputs in current session
+  ctx statusline                     One-line status for Claude Code statusline hook
+  ctx report [--out PATH] [--days N] Generate self-contained HTML report
   ctx restore --list                 List gzipped JSONL backups for this project
   ctx restore <session-id> [--to P]  Gunzip backup to stdout or file
   ctx config                         Show / create config file
@@ -430,6 +432,62 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runStatusline(_args, config) {
+  const cwd = process.cwd();
+  let pipe;
+  try { pipe = runAnalyze({ cwd, config }); } catch {}
+  if (!pipe) { process.stdout.write(''); return 0; }
+
+  const icon = { comfortable: '✓', watch: '○', compact: '◐', urgent: '●', critical: '⚠' }[pipe.decision.level] || '·';
+  const pct  = pipe.decision.metrics.contextPct;
+  const tok  = fmtK(pipe.decision.metrics.contextTokens);
+
+  const memoryDir = resolveMemoryDir(cwd, config);
+  let snapCount = 0, lastSnap = null;
+  try {
+    const names = fs.readdirSync(memoryDir);
+    const projs = names.filter(n => n.startsWith('project_') && n.endsWith('.md'));
+    snapCount = projs.length;
+    let newest = 0;
+    for (const n of projs) {
+      const t = fs.statSync(path.join(memoryDir, n)).mtimeMs;
+      if (t > newest) newest = t;
+    }
+    if (newest) lastSnap = newest;
+  } catch {}
+
+  const parts = [`${icon} ${pct}%/${tok}`];
+  if (snapCount) parts.push(`${snapCount} snap${snapCount === 1 ? '' : 's'}`);
+  if (lastSnap) {
+    const mins = Math.round((Date.now() - lastSnap) / 60000);
+    const ago = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+    parts.push(`last ${ago}`);
+  }
+  process.stdout.write('ctx ' + parts.join(' · '));
+  return 0;
+}
+
+function runReport(args, config) {
+  stripColor();
+  const cwd = process.cwd();
+  let outPath = null;
+  let days = 30;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--out' && args[i + 1]) { outPath = args[i + 1]; i++; }
+    else if (args[i] === '--days' && args[i + 1]) { days = Number(args[i + 1]); i++; }
+  }
+  const { generateReport } = require('./report.js');
+  const target = outPath ? path.resolve(outPath) : path.join(cwd, `ctx-report-${new Date().toISOString().slice(0,10)}.html`);
+  const html = generateReport({ cwd, config, days });
+  fs.writeFileSync(target, html);
+  console.log('');
+  console.log(C.green + `  ✓ HTML report written` + C.reset);
+  console.log(C.gray + `    ${target}` + C.reset);
+  console.log(C.dim + `    open file://${target}` + C.reset);
+  console.log('');
+  return 0;
+}
+
 function runBloat(args, _config) {
   stripColor();
   const cwd = process.cwd();
@@ -730,6 +788,10 @@ function main(argv) {
       return runUsage(rest, config);
     case 'heavy':
       return runHeavy(rest, config);
+    case 'statusline':
+      return runStatusline(rest, config);
+    case 'report':
+      return runReport(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':

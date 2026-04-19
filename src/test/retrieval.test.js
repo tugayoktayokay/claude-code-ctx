@@ -47,6 +47,20 @@ test('scoreSnapshot combines category + keyword + recency', () => {
   assert.ok(r.breakdown.recency > 0.5, 'recent decays slowly');
 });
 
+test('bm25Score rewards rare terms more than common terms', () => {
+  const { bm25Score, buildCorpusStats, tokenizeBody } = require('../retrieval.js');
+  const candidates = [
+    { body: 'stripe webhook idempotency', length: 30, _terms: tokenizeBody('stripe webhook idempotency') },
+    { body: 'generic the and file',       length: 30, _terms: tokenizeBody('generic the and file') },
+    { body: 'another generic the file',   length: 30, _terms: tokenizeBody('another generic the file') },
+    { body: 'stripe subscription webhook',length: 30, _terms: tokenizeBody('stripe subscription webhook') },
+  ];
+  const corpus = buildCorpusStats(candidates);
+  const rare   = bm25Score(['idempotency'], candidates[0], corpus);
+  const common = bm25Score(['generic'],     candidates[1], corpus);
+  assert.ok(rare > common, `rare(${rare}) should beat common(${common})`);
+});
+
 test('rank returns top_n sorted, filters below min_score', () => {
   const { base, memoryDir } = tmpMemory([
     { name: 'project_stripe.md',  body: 'stripe webhook body',                 ageDays: 1,  categories: ['stripe'] },

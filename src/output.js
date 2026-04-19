@@ -188,7 +188,8 @@ function printRetrieval(results, query, opts = {}) {
     const r = results[i];
     const b = r.breakdown;
     const age = timeAgo(r.snapshot.mtime);
-    console.log(`  ${C.bold}#${i + 1}${C.reset}  ${C.green}score ${r.score.toFixed(2)}${C.reset}  ${r.snapshot.name}`);
+    const cite = citeFor(r.snapshot);
+    console.log(`  ${C.bold}#${i + 1}${C.reset}  ${C.green}score ${r.score.toFixed(2)}${C.reset}  ${C.magenta}${cite}${C.reset}  ${r.snapshot.name}`);
     console.log(`      ${C.gray}matched: category=${b.category.toFixed(2)} keyword=${b.keyword.toFixed(2)} recency=${b.recency.toFixed(2)}${C.reset}`);
     console.log(`      ${C.gray}cats: ${(r.snapshot.categories || []).join(', ') || '(none)'} | ${age}${C.reset}`);
     const firstBody = (r.snapshot.body || '').split('\n').filter(l => l.trim()).slice(0, 3).join(' ').slice(0, 140);
@@ -196,6 +197,18 @@ function printRetrieval(results, query, opts = {}) {
     console.log(C.dim + `      ${r.snapshot.path}` + C.reset);
     console.log('');
   }
+  if (results.length) {
+    console.log(C.dim + `  Cite a snapshot by pasting its id (e.g. ${citeFor(results[0].snapshot)}) into Claude.` + C.reset);
+    console.log('');
+  }
+}
+
+function citeFor(snap) {
+  const fp = snap?.meta?.fingerprint || '';
+  if (fp) return `#${fp.slice(0, 8)}`;
+  const name = snap?.name || '';
+  const m = name.match(/^project_([a-z0-9_]+)/i);
+  return m ? `#${m[1].slice(0, 12)}` : `#${(name || 'x').slice(0, 8)}`;
 }
 
 function timeAgo(ms) {
