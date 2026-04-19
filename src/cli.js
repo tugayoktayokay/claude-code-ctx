@@ -58,6 +58,10 @@ Analysis + memory:
   ctx history [N]                    Last N sessions (default 10)
   ctx prune [--apply] [--older-than 30d] [--keep-last 20] [--per-project]
                                      Clean memory dir; dry-run by default
+  ctx bloat                          CLAUDE.md + SKILL.md footprint audit
+  ctx usage [--tools|--skills] [--days 30]
+                                     Aggregate tool/skill usage across sessions
+  ctx heavy [jsonl-path]             Largest tool outputs in current session
   ctx restore --list                 List gzipped JSONL backups for this project
   ctx restore <session-id> [--to P]  Gunzip backup to stdout or file
   ctx config                         Show / create config file
@@ -426,6 +430,61 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runBloat(_args, _config) {
+  stripColor();
+  const cwd = process.cwd();
+  const { scanClaudeMd, scanSkills } = require('./optimize.js');
+  const { printBloat } = require('./output.js');
+  printBloat({
+    claudeMd: scanClaudeMd(cwd),
+    skills:   scanSkills(),
+  });
+  return 0;
+}
+
+function runUsage(args, config) {
+  stripColor();
+  const {
+    aggregateToolUsage,
+    aggregateSkillUsage,
+    listSessionsInRange,
+  } = require('./optimize.js');
+  const { printUsage } = require('./output.js');
+
+  let mode = 'tools';
+  let days = 30;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--tools')  mode = 'tools';
+    else if (args[i] === '--skills') mode = 'skills';
+    else if (args[i] === '--days' && args[i + 1]) { days = Number(args[i + 1]); i++; }
+  }
+
+  const sessions = listSessionsInRange(days);
+  if (mode === 'skills') {
+    const out = aggregateSkillUsage(sessions);
+    printUsage(`ctx usage --skills (last ${days}d)`, out.ranked, out);
+  } else {
+    const out = aggregateToolUsage(sessions);
+    printUsage(`ctx usage --tools (last ${days}d)`, out.ranked, out);
+  }
+  return 0;
+}
+
+function runHeavy(args, config) {
+  stripColor();
+  const cwd = process.cwd();
+  const sessionPath = args[0] && !args[0].startsWith('--') ? args[0] : null;
+  const pipe = runAnalyze({ cwd, sessionPath, config });
+  if (!pipe) {
+    console.error('❌ No active session');
+    return 1;
+  }
+  const { topHeavyOutputs } = require('./optimize.js');
+  const { printHeavy } = require('./output.js');
+  printHeavy(topHeavyOutputs(pipe.analysis, 15));
+  return 0;
+}
+
 function runStats(args, config) {
   stripColor();
   let rangeDays = 7;
@@ -658,6 +717,12 @@ function main(argv) {
       return runDiff(rest, config);
     case 'stats':
       return runStats(rest, config);
+    case 'bloat':
+      return runBloat(rest, config);
+    case 'usage':
+      return runUsage(rest, config);
+    case 'heavy':
+      return runHeavy(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':

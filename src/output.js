@@ -236,9 +236,81 @@ module.exports = {
   printTimeline,
   printDiff,
   printStats,
+  printBloat,
+  printUsage,
+  printHeavy,
   timeAgo,
   macNotify,
 };
+
+function fmtBytesShort(n) {
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + 'M';
+  if (n >= 1024)        return (n / 1024).toFixed(1) + 'k';
+  return `${n}B`;
+}
+
+function printBloat(report) {
+  console.log('');
+  console.log(C.bold + '  ctx bloat — system prompt footprint' + C.reset);
+  console.log('');
+  let total = 0;
+  for (const cmd of report.claudeMd) {
+    total += cmd.bytes;
+    const bad = cmd.bytes > 4000;
+    console.log(`  ${bad ? C.yellow + '⚠' + C.reset : C.green + '✓' + C.reset} ${cmd.path}  ${fmtBytesShort(cmd.bytes)}`);
+    for (const s of cmd.topSections) {
+      console.log(`      ${C.gray}${s.heading.padEnd(40)}${C.reset} ${fmtBytesShort(s.bytes).padStart(6)}`);
+    }
+  }
+  if (!report.claudeMd.length) console.log(C.gray + '  (no CLAUDE.md found)' + C.reset);
+  console.log('');
+  console.log(C.bold + '  Skills (SKILL.md files on disk):' + C.reset);
+  let skillBytes = 0;
+  for (const s of report.skills.slice(0, 10)) {
+    skillBytes += s.bytes;
+    console.log(`    ${C.gray}${s.name.padEnd(40)}${C.reset} ${fmtBytesShort(s.bytes).padStart(6)}  ${C.dim}${s.description.slice(0, 60)}${C.reset}`);
+  }
+  if (report.skills.length > 10) {
+    console.log(C.gray + `    … and ${report.skills.length - 10} more` + C.reset);
+  }
+  console.log('');
+  console.log(`  ${C.dim}CLAUDE.md total:${C.reset} ${fmtBytesShort(total)}   ${C.dim}Skills (top 10):${C.reset} ${fmtBytesShort(skillBytes)}`);
+  console.log('');
+}
+
+function printUsage(title, ranked, meta) {
+  console.log('');
+  console.log(C.bold + `  ${title}` + C.reset);
+  console.log(C.gray + `    scanned ${meta.scanned} session(s)` + C.reset);
+  console.log('');
+  if (!ranked.length) {
+    console.log(C.gray + '    (no data)' + C.reset);
+    console.log('');
+    return;
+  }
+  const max = ranked[0].count || 1;
+  for (const r of ranked.slice(0, 30)) {
+    const bar = '█'.repeat(Math.round((r.count / max) * 20));
+    const warn = r.count === 0 ? C.yellow + '⚠ 0 uses' + C.reset : '';
+    console.log(`    ${C.gray}${r.name.padEnd(38)}${C.reset} ${String(r.count).padStart(4)}  ${C.cyan}${bar}${C.reset} ${warn}`);
+  }
+  console.log('');
+}
+
+function printHeavy(items) {
+  console.log('');
+  console.log(C.bold + '  ctx heavy — largest tool outputs (current session)' + C.reset);
+  console.log('');
+  if (!items.length) {
+    console.log(C.gray + '    (no large outputs in this session)' + C.reset);
+    console.log('');
+    return;
+  }
+  for (const it of items) {
+    console.log(`    ${C.yellow}${fmtBytesShort(it.size).padStart(8)}${C.reset}  ${C.gray}${it.tool.padEnd(20)}${C.reset}  ${(it.preview || '').slice(0, 60)}`);
+  }
+  console.log('');
+}
 
 function printStats(stats) {
   console.log('');

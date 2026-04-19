@@ -201,9 +201,20 @@ function handleUserPromptSubmit(input, config) {
   let pipe;
   try { pipe = pipeline.runAnalyze({ cwd, sessionId: input.session_id, config }); } catch { pipe = null; }
 
-  if (warnOn.length && pipe && warnOn.includes(pipe.decision.level)) {
-    const msg = `[ctx] context ${pipe.decision.metrics.contextPct}% of quality ceiling — consider /compact`;
-    return { output: msg, exitCode: 0 };
+  if (warnOn.length && pipe) {
+    if (warnOn.includes(pipe.decision.level)) {
+      const msg = `[ctx] context ${pipe.decision.metrics.contextPct}% of quality ceiling — consider /compact`;
+      return { output: msg, exitCode: 0 };
+    }
+    if (warnOn.includes('verbose')) {
+      const threshold = config?.limits?.output_ratio_warn ?? 0.4;
+      const ctx = pipe.decision?.metrics?.contextTokens || 0;
+      const output = pipe.analysis?.totalOutput || 0;
+      if (ctx > 20000 && output / ctx >= threshold) {
+        const pct = Math.round((output / ctx) * 100);
+        return { output: `[ctx] output ratio ${pct}% of context — ask Claude to keep responses short`, exitCode: 0 };
+      }
+    }
   }
 
   if (!auto.enabled) return { output: null, exitCode: 0 };
