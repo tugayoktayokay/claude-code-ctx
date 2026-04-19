@@ -9,6 +9,29 @@ const { loadDefaults } = require('../config.js');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'demo-session.jsonl');
 
+test('largeOutputs carry tool name from tool_use_id + hint', () => {
+  const { analyzeEntries } = require('../analyzer.js');
+  const { loadDefaults } = require('../config.js');
+  const config = loadDefaults();
+  const big = 'x'.repeat(50000);
+  const entries = [
+    { type: 'assistant', message: { content: [
+      { type: 'tool_use', id: 'u1', name: 'Bash', input: { command: 'ls -R /' } },
+      { type: 'tool_use', id: 'u2', name: 'Read', input: { file_path: '/x' } },
+    ] } },
+    { type: 'user', message: { content: [
+      { type: 'tool_result', tool_use_id: 'u1', content: big },
+      { type: 'tool_result', tool_use_id: 'u2', content: big },
+    ] } },
+  ];
+  const a = analyzeEntries(entries, config);
+  const tools = a.largeOutputs.map(o => o.tool).sort();
+  assert.deepEqual(tools, ['Bash', 'Read']);
+  const bash = a.largeOutputs.find(o => o.tool === 'Bash');
+  assert.ok(bash.hint, 'hint populated');
+  assert.match(bash.hint, /ls|head|narrow/i);
+});
+
 test('analyzeEntries pulls token, tool, and content metrics', () => {
   const config   = loadDefaults();
   const entries  = parseJSONL(FIXTURE);

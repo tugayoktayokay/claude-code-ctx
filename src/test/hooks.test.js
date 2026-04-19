@@ -216,6 +216,37 @@ test('user-prompt-submit: silent when warn_on empty and auto_retrieve disabled',
   assert.equal(res.output, null);
 });
 
+test('user-prompt-submit warn_on heavy injects tool-size summary with hint', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.user_prompt_submit = { warn_on: ['heavy'], heavy_threshold_bytes: 5000, auto_retrieve: { enabled: false } };
+
+  const pipeMock = require('../pipeline.js');
+  const original = pipeMock.runAnalyze;
+  pipeMock.runAnalyze = () => ({
+    analysis: {
+      userMessages: 3,
+      largeOutputs: [
+        { tool: 'Bash', size: 48000, preview: '...', hint: 'pipe through head -100 (47KB now)' },
+        { tool: 'Read', size: 22000, preview: '...', hint: 'pass offset + limit (21KB now)' },
+      ],
+    },
+    decision: { metrics: { contextPct: 30, contextTokens: 60000 }, level: 'watch' },
+    strategy: {},
+    session: {}, entries: [],
+    modelId: 'x', sessionId: 'x', limits: {},
+  });
+
+  try {
+    const res = handleUserPromptSubmit({ cwd: '/tmp/h', prompt: 'continue' }, cfg);
+    assert.ok(res.output);
+    assert.match(String(res.output), /heavy tool outputs/);
+    assert.match(String(res.output), /Bash/);
+    assert.match(String(res.output), /hint:/);
+  } finally {
+    pipeMock.runAnalyze = original;
+  }
+});
+
 test('user-prompt-submit auto-retrieves past snapshot on first prompt', () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-auto-'));
   const memoryDir = path.join(base, 'memory');

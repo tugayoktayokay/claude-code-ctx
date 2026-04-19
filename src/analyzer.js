@@ -74,6 +74,7 @@ function analyzeEntries(entries, config) {
 
   let turn = 0;
   let prevInput = 0;
+  const toolUseById = new Map();
 
   for (const entry of entries) {
     const ts = Date.parse(entry.timestamp || '') || null;
@@ -131,13 +132,17 @@ function analyzeEntries(entries, config) {
       const msgContent = entry.message?.content;
       if (Array.isArray(msgContent)) {
         for (const block of msgContent) {
-          if (block?.type === 'tool_use') recordToolUse(analysis, block.name, block.input);
+          if (block?.type === 'tool_use') {
+            recordToolUse(analysis, block.name, block.input);
+            if (block.id) toolUseById.set(block.id, { name: block.name, input: block.input });
+          }
         }
       }
     }
 
     if (entry.type === 'tool_use') {
       recordToolUse(analysis, entry.tool || entry.name, entry.input);
+      if (entry.id) toolUseById.set(entry.id, { name: entry.tool || entry.name, input: entry.input });
     }
 
     if (entry.type === 'tool_result' || entry.type === 'user') {
@@ -149,10 +154,15 @@ function analyzeEntries(entries, config) {
               ? block.content
               : JSON.stringify(block.content || '');
             if (out.length > 2000) {
+              const fromMap = block.tool_use_id ? toolUseById.get(block.tool_use_id) : null;
+              const toolName = fromMap?.name || 'tool_result';
+              const preview = out.slice(0, 100);
+              const hint = heavyHintFor(toolName, fromMap?.input, out.length);
               analysis.largeOutputs.push({
-                tool: 'tool_result',
+                tool: toolName,
                 size: out.length,
-                preview: out.slice(0, 100),
+                preview,
+                hint,
               });
             }
           }
@@ -171,6 +181,25 @@ function analyzeEntries(entries, config) {
   }
 
   return analysis;
+}
+
+function heavyHintFor(toolName, input, size) {
+  const kb = Math.round(size / 1024);
+  const t = (toolName || '').toLowerCase();
+  if (t === 'bash') {
+    const cmd = (input?.command || '').split(/\s+/)[0];
+    if (['ls','find','tree'].includes(cmd)) return `pipe ${cmd} through head -50 or narrow with a specific pattern (${kb}KB now)`;
+    if (cmd === 'cat' || cmd === 'less') return `use Read with offset+limit instead of cat (${kb}KB now)`;
+    if (cmd === 'grep' || cmd === 'rg') return `add -l or head -50, or use Grep tool with head_limit (${kb}KB now)`;
+    return `pipe through head -100 or grep a narrower pattern (${kb}KB now)`;
+  }
+  if (t === 'read')   return `pass offset + limit to Read, or grep the file first (${kb}KB now)`;
+  if (t === 'grep')   return `pass head_limit, or filter with type/glob (${kb}KB now)`;
+  if (t === 'glob')   return `narrow the pattern (${kb}KB of paths)`;
+  if (t === 'webfetch' || t === 'webfetch') return `make the prompt more specific so the model extracts less (${kb}KB now)`;
+  if (t === 'websearch') return `add quoted terms to narrow results (${kb}KB now)`;
+  if (t.startsWith('mcp__')) return `this MCP tool returned ${kb}KB — check if it has a limit/filter parameter`;
+  return `consider a narrower scope (${kb}KB now)`;
 }
 
 function recordToolUse(analysis, toolName, input) {

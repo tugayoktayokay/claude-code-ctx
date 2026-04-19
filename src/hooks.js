@@ -208,11 +208,26 @@ function handleUserPromptSubmit(input, config) {
     }
     if (warnOn.includes('verbose')) {
       const threshold = config?.limits?.output_ratio_warn ?? 0.4;
-      const ctx = pipe.decision?.metrics?.contextTokens || 0;
+      const ctxTokens = pipe.decision?.metrics?.contextTokens || 0;
       const output = pipe.analysis?.totalOutput || 0;
-      if (ctx > 20000 && output / ctx >= threshold) {
-        const pct = Math.round((output / ctx) * 100);
+      if (ctxTokens > 20000 && output / ctxTokens >= threshold) {
+        const pct = Math.round((output / ctxTokens) * 100);
         return { output: `[ctx] output ratio ${pct}% of context — ask Claude to keep responses short`, exitCode: 0 };
+      }
+    }
+    if (warnOn.includes('heavy')) {
+      const heavyBytes = config?.hooks?.user_prompt_submit?.heavy_threshold_bytes ?? 10000;
+      const outs = pipe.analysis?.largeOutputs || [];
+      const big = outs.filter(o => o.size >= heavyBytes).slice(-3);
+      if (big.length) {
+        const byTool = {};
+        for (const o of big) byTool[o.tool] = (byTool[o.tool] || 0) + o.size;
+        const summary = Object.entries(byTool)
+          .map(([t, s]) => `${t} ${Math.round(s / 1024)}KB`)
+          .join(', ');
+        const hints = big.map(o => o.hint).filter(Boolean).slice(0, 2).join('; ');
+        const tail = hints ? ` — hint: ${hints}` : '';
+        return { output: `[ctx] heavy tool outputs this session: ${summary}${tail}`, exitCode: 0 };
       }
     }
   }

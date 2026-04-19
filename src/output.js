@@ -353,8 +353,12 @@ function printHeavy(items) {
     return;
   }
   for (const it of items) {
-    console.log(`    ${C.yellow}${fmtBytesShort(it.size).padStart(8)}${C.reset}  ${C.gray}${it.tool.padEnd(20)}${C.reset}  ${(it.preview || '').slice(0, 60)}`);
+    console.log(`    ${C.yellow}${fmtBytesShort(it.size).padStart(8)}${C.reset}  ${C.cyan}${(it.tool || '').padEnd(20)}${C.reset}  ${C.gray}${(it.preview || '').slice(0, 60)}${C.reset}`);
+    if (it.hint) console.log(`              ${C.dim}→ ${it.hint}${C.reset}`);
   }
+  console.log('');
+  const total = items.reduce((a, b) => a + b.size, 0);
+  console.log(C.dim + `    total in top ${items.length}: ${fmtBytesShort(total)}` + C.reset);
   console.log('');
 }
 

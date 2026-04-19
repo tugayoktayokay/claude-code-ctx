@@ -84,6 +84,7 @@
     },
     "user_prompt_submit": {
       "warn_on": [],
+      "heavy_threshold_bytes": 10000,
       "auto_retrieve": {
         "enabled": true,
         "max_turns": 2,
