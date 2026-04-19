@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-code-ctx",
+  "description": "Marketplace hosting the ctx plugin — Claude Code context manager with memory engine, hooks + MCP integration, and system-prompt bloat audit.",
+  "owner": {
+    "name": "Tugay Oktay Okay"
+  },
+  "plugins": [
+    {
+      "name": "ctx",
+      "description": "Context manager: token monitoring, auto-snapshot + JSONL backup, tailored /compact prompt, BM25 snapshot search, 9 MCP tools (ctx_ask, ctx_shell, ctx_read, ctx_grep, ctx_cache_get + memory), PreToolUse guardrails, bloat audit. Zero runtime deps, no LLM calls.",
+      "source": ".",
+      "category": "development",
+      "homepage": "https://github.com/tugayoktayokay/claude-code-ctx"
+    }
+  ]
+}
