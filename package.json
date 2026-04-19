@@ -1,16 +1,42 @@
 {
   "name": "ctx",
   "version": "0.1.0",
-  "description": "Claude Code context manager — zero-dep JSONL analyzer, tailored /compact prompt builder, snapshot-to-memory bridge",
+  "description": "Claude Code context manager — standalone zero-dep CLI that tracks session token usage against a model-aware quality ceiling, generates tailored /compact prompts, and bridges sessions to memory.",
   "bin": {
     "ctx": "bin/ctx"
   },
   "scripts": {
-    "test": "node --test src/test/"
+    "test": "node --test src/test/*.test.js"
   },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "context",
+    "token",
+    "compact",
+    "snapshot",
+    "cli",
+    "zero-dependency"
+  ],
+  "author": "Tugay Oktay Okay",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tugayoktayokay/ctx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tugayoktayokay/ctx/issues"
+  },
+  "homepage": "https://github.com/tugayoktayokay/ctx#readme",
   "engines": {
     "node": ">=18"
   },
-  "license": "UNLICENSED",
-  "private": true
+  "files": [
+    "bin/",
+    "src/",
+    "config.default.json",
+    "LICENSE",
+    "README.md"
+  ]
 }
