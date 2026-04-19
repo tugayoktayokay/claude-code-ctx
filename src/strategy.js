@@ -125,9 +125,10 @@ function buildCompactPrompt(analysis, topCatLabels, strategy) {
 
 function copyToClipboard(text) {
   if (process.platform !== 'darwin') return false;
+  const clean = String(text || '').replace(/^\s+/, '').replace(/\s+$/, '');
   try {
     const { execSync } = require('child_process');
-    execSync('pbcopy', { input: text });
+    execSync('pbcopy', { input: clean });
     return true;
   } catch {
     return false;

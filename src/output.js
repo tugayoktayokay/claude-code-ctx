@@ -114,13 +114,16 @@ function printCompactResult(analysis, decision, strategy, sessionPath, modelId, 
 
   const line = '─'.repeat(52);
   console.log(line);
-  console.log(C.bold + C.cyan + '  /compact prompt (copy + paste):' + C.reset);
+  console.log(C.bold + C.cyan + '  /compact prompt (paste into Claude Code):' + C.reset);
   console.log('');
-  console.log(C.bold + '  ' + strategy.compactPrompt + C.reset);
+  console.log(C.bold + strategy.compactPrompt + C.reset);
   console.log('');
   console.log(line);
   if (clipboardOk) {
-    console.log(C.gray + '  ✓ Copied to clipboard' + C.reset);
+    console.log(C.green + '  ✓ Copied to clipboard — paste with ⌘V in Claude Code input' + C.reset);
+    console.log(C.dim + '    (do NOT select the line above with mouse — it picks up indent. Use ⌘V.)' + C.reset);
+  } else {
+    console.log(C.yellow + '  ⚠ clipboard unavailable — copy the single line above exactly' + C.reset);
   }
   console.log('');
 }

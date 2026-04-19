@@ -107,7 +107,12 @@ function runAnalyzeCmd(args, config) {
 function runCompact(args, config) {
   stripColor();
   const cwd = process.cwd();
-  const sessionPath = args[0] && !args[0].startsWith('--') ? args[0] : null;
+  let raw = false;
+  let sessionPath = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--raw') raw = true;
+    else if (!args[i].startsWith('--') && !sessionPath) sessionPath = args[i];
+  }
   const pipe = runAnalyze({ cwd, sessionPath, config });
 
   if (!pipe) {
@@ -115,8 +120,16 @@ function runCompact(args, config) {
     return 1;
   }
 
-  const clipboardOk = copyToClipboard(pipe.strategy.compactPrompt);
-  printCompactResult(pipe.analysis, pipe.decision, pipe.strategy, pipe.session.path, pipe.modelId, clipboardOk);
+  if (raw) {
+    const stripped = pipe.strategy.compactPrompt.replace(/^\/compact\s*/, '').trim();
+    copyToClipboard(stripped);
+    process.stdout.write(stripped + '\n');
+    return 0;
+  }
+
+  const clean = pipe.strategy.compactPrompt.trim();
+  const clipboardOk = copyToClipboard(clean);
+  printCompactResult(pipe.analysis, pipe.decision, { ...pipe.strategy, compactPrompt: clean }, pipe.session.path, pipe.modelId, clipboardOk);
   return 0;
 }
 
