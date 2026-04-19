@@ -32,9 +32,35 @@ Existing tooling doesn't surface this:
 
 ## Install
 
+Two install paths — pick one.
+
+### Option A: Plugin (recommended, same UX as context-mode)
+
+```bash
+# One-time clone
+git clone https://github.com/tugayoktayokay/claude-code-ctx ~/.claude/plugins/claude-code-ctx
+```
+
+Then inside any Claude Code session:
+
+```
+/plugin install file:///$HOME/.claude/plugins/claude-code-ctx
+```
+
+Or, once published to a marketplace:
+
+```
+/plugin marketplace add tugayoktayokay/claude-code-ctx
+/plugin install ctx
+```
+
+Claude Code reads `.claude-plugin/plugin.json`, auto-registers all 6 hooks + the MCP server. Manage with `/plugin list`, `/plugin disable ctx`, `/plugin update ctx`. No `ctx setup` needed for this path.
+
+### Option B: npm + manual setup (scripting / no plugin system)
+
 ```bash
 npm install -g claude-code-ctx
-ctx setup         # installs Claude Code hooks + ensures config file
+ctx setup         # writes hooks + MCP entry into ~/.claude/settings.json
 ctx status        # verify everything is wired
 ```
 

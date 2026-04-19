@@ -1,0 +1,93 @@
+{
+  "name": "ctx",
+  "version": "0.3.0",
+  "description": "Claude Code context manager — token monitoring, auto-snapshot + JSONL backup on /clear, tailored /compact prompt, personal dev memory engine with BM25 search, system-prompt bloat audit. Zero runtime deps, no LLM calls.",
+  "author": {
+    "name": "Tugay Oktay Okay"
+  },
+  "keywords": [
+    "context",
+    "memory",
+    "token",
+    "compact",
+    "snapshot",
+    "backup",
+    "bloat",
+    "search",
+    "bm25",
+    "zero-deps"
+  ],
+  "homepage": "https://github.com/tugayoktayokay/claude-code-ctx",
+  "repository": "https://github.com/tugayoktayokay/claude-code-ctx",
+  "license": "MIT",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook session-start"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook pre-compact"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook pre-tool-use"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook post-tool-use"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx hook user-prompt-submit"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "ctx": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/ctx",
+      "args": ["serve"]
+    }
+  }
+}

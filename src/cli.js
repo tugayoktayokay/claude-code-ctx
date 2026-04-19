@@ -384,20 +384,30 @@ function runStatus(_args, config) {
   console.log(`    ${C.gray}user:   ${C.reset} ${USER_PATH}${fs.existsSync(USER_PATH) ? '' : C.gray + ' (not created)' + C.reset}`);
   console.log('');
 
-  // hooks
+  // hooks + plugin detection
   let hooksLabel = C.gray + 'not installed' + C.reset;
+  let pluginLabel = C.gray + 'not detected' + C.reset;
   try {
     const settings = hooksInstall.readSettings();
     const events = hooksInstall.listInstalledEvents(settings);
     if (events.length) {
-      hooksLabel = C.green + `installed (${events.length} events)` + C.reset;
+      hooksLabel = C.green + `installed via ctx setup (${events.length} events)` + C.reset;
     }
   } catch (err) {
     hooksLabel = C.red + `settings.json error: ${err.message}` + C.reset;
   }
-  console.log(C.dim + '  Hooks:' + C.reset);
-  console.log(`    ${C.gray}status: ${C.reset}${hooksLabel}`);
-  console.log(`    ${C.gray}install:${C.reset} ctx setup`);
+  const pluginManifest = path.resolve(__dirname, '..', '.claude-plugin', 'plugin.json');
+  if (fs.existsSync(pluginManifest)) {
+    try {
+      const p = JSON.parse(fs.readFileSync(pluginManifest, 'utf8'));
+      pluginLabel = C.green + `v${p.version || '?'} (${pluginManifest})` + C.reset;
+    } catch {}
+  }
+  console.log(C.dim + '  Hooks (manual install):' + C.reset);
+  console.log(`    ${C.gray}status:  ${C.reset}${hooksLabel}`);
+  console.log(C.dim + '  Plugin manifest:' + C.reset);
+  console.log(`    ${C.gray}status:  ${C.reset}${pluginLabel}`);
+  console.log(C.dim + `    install via: /plugin install file://${path.dirname(path.dirname(pluginManifest))}` + C.reset);
   console.log('');
 
   // daemon

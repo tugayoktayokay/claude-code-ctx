@@ -36,6 +36,7 @@
     "bin/",
     "src/",
     "config.default.json",
+    ".claude-plugin/",
     "LICENSE",
     "README.md"
   ]
