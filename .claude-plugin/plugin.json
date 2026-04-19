@@ -20,6 +20,7 @@
   "homepage": "https://github.com/tugayoktayokay/claude-code-ctx",
   "repository": "https://github.com/tugayoktayokay/claude-code-ctx",
   "license": "MIT",
+  "commands": "./commands/",
   "hooks": {
     "SessionStart": [
       {
