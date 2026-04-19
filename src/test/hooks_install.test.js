@@ -85,6 +85,25 @@ test('uninstallHooks leaves empty settings untouched structurally', () => {
   const installed = installHooks(empty);
   const removed = uninstallHooks(installed);
   assert.deepEqual(removed.hooks, {}, 'all ctx-only events cleaned out');
+  assert.deepEqual(removed.mcpServers || {}, {}, 'ctx mcp server removed');
+});
+
+test('installHooks registers MCP server entry tagged source:ctx', () => {
+  const next = installHooks({});
+  assert.ok(next.mcpServers);
+  assert.ok(next.mcpServers.ctx);
+  assert.equal(next.mcpServers.ctx.source, 'ctx');
+  assert.deepEqual(next.mcpServers.ctx.args, ['serve']);
+});
+
+test('installHooks preserves foreign mcpServers, only touches ctx entry', () => {
+  const user = { mcpServers: { other: { command: 'other-mcp', args: [] } } };
+  const next = installHooks(user);
+  assert.ok(next.mcpServers.other, 'foreign MCP kept');
+  assert.ok(next.mcpServers.ctx, 'ctx MCP added');
+  const removed = uninstallHooks(next);
+  assert.ok(removed.mcpServers.other, 'foreign MCP still kept after uninstall');
+  assert.equal(removed.mcpServers.ctx, undefined, 'ctx MCP removed');
 });
 
 test('listInstalledEvents returns events with ctx entries only', () => {

@@ -48,6 +48,7 @@ Integration:
   ctx uninstall-hooks                Remove ctx hooks; keep any foreign hooks
   ctx status                         Health snapshot (hooks, daemon, last snapshot, backups)
   ctx hook <event>                   Internal: stdin/stdout handler for Claude Code hooks
+  ctx serve                          Internal: MCP server (stdio JSON-RPC). Registered by ctx setup.
 
 Analysis + memory:
   ctx                                Analyze current session (summary + recommendation)
@@ -496,6 +497,18 @@ function runUpgrade(args, config) {
   return 0;
 }
 
+async function runServe(_args, config) {
+  const { makeServer, log: mcpLog } = require('./mcp.js');
+  const { allTools } = require('./mcp_tools.js');
+  const cache = require('./mcp_cache.js');
+  cache.sweepExpired();
+  mcpLog(`serve start pid=${process.pid} cwd=${process.cwd()} tools=${allTools().length}`);
+  const server = makeServer({ tools: allTools(), config });
+  await server.runStdio();
+  mcpLog('serve exit');
+  return 0;
+}
+
 function runStatusline(_args, config) {
   const cwd = process.cwd();
   let pipe;
@@ -854,6 +867,8 @@ function main(argv) {
       return runHeavy(rest, config);
     case 'statusline':
       return runStatusline(rest, config);
+    case 'serve':
+      return runServe(rest, config);
     case 'report':
       return runReport(rest, config);
     case 'doctor':

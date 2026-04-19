@@ -109,30 +109,51 @@ function installHooks(settings, opts = {}) {
     stripped.push(group);
     out.hooks[eventName] = stripped;
   }
+
+  out.mcpServers = { ...(settings.mcpServers || {}) };
+  const serveCmd = commandPrefix;
+  out.mcpServers.ctx = {
+    command: serveCmd,
+    args: ['serve'],
+    source: SOURCE_TAG,
+    ctxSchemaVersion: SCHEMA_VERSION,
+  };
+
   return out;
 }
 
 function uninstallHooks(settings) {
   const out = { ...settings };
-  if (!out.hooks || typeof out.hooks !== 'object') return out;
-  const nextHooks = {};
-  for (const [eventName, groups] of Object.entries(out.hooks)) {
-    if (!Array.isArray(groups)) { nextHooks[eventName] = groups; continue; }
-    const filtered = [];
-    for (const group of groups) {
-      if (!group || typeof group !== 'object') { filtered.push(group); continue; }
-      const hooksArr = Array.isArray(group.hooks) ? group.hooks : [];
-      const kept = hooksArr.filter(h => !isCtxEntry(h));
-      if (kept.length === 0 && hooksArr.length > 0) continue;
-      if (kept.length !== hooksArr.length) {
-        filtered.push({ ...group, hooks: kept });
-      } else {
-        filtered.push(group);
+  if (out.hooks && typeof out.hooks === 'object') {
+    const nextHooks = {};
+    for (const [eventName, groups] of Object.entries(out.hooks)) {
+      if (!Array.isArray(groups)) { nextHooks[eventName] = groups; continue; }
+      const filtered = [];
+      for (const group of groups) {
+        if (!group || typeof group !== 'object') { filtered.push(group); continue; }
+        const hooksArr = Array.isArray(group.hooks) ? group.hooks : [];
+        const kept = hooksArr.filter(h => !isCtxEntry(h));
+        if (kept.length === 0 && hooksArr.length > 0) continue;
+        if (kept.length !== hooksArr.length) {
+          filtered.push({ ...group, hooks: kept });
+        } else {
+          filtered.push(group);
+        }
       }
+      if (filtered.length > 0) nextHooks[eventName] = filtered;
     }
-    if (filtered.length > 0) nextHooks[eventName] = filtered;
+    out.hooks = nextHooks;
   }
-  out.hooks = nextHooks;
+
+  if (out.mcpServers && typeof out.mcpServers === 'object') {
+    const nextMcp = {};
+    for (const [k, v] of Object.entries(out.mcpServers)) {
+      if (v && v.source === SOURCE_TAG) continue;
+      nextMcp[k] = v;
+    }
+    out.mcpServers = nextMcp;
+  }
+
   return out;
 }
 
