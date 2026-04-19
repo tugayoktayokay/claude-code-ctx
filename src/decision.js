@@ -29,11 +29,11 @@ function makeDecision(analysis, limits, config) {
   const action = actionFor(level, pctCeiling, ctx);
 
   reasons.push(
-    `Context ${Math.round(pctCeiling * 100)}% of ${fmtK(ceiling)} quality ceiling (${fmtK(ctx)} token)`
+    `Context ${Math.round(pctCeiling * 100)}% of ${fmtK(ceiling)} quality ceiling (${fmtK(ctx)} tokens)`
   );
 
   if (absoluteMax > ceiling) {
-    reasons.push(`Model limit: ${fmtK(absoluteMax)}, but quality düşüşü ${fmtK(ceiling)}'dan sonra başlar`);
+    reasons.push(`Model max: ${fmtK(absoluteMax)}, but quality degrades past ${fmtK(ceiling)}`);
   }
 
   if (analysis.avgGrowthPerTurn > 0) {
@@ -44,7 +44,7 @@ function makeDecision(analysis, limits, config) {
       if (remaining > 0) {
         const turnsLeft = Math.round(remaining / analysis.avgGrowthPerTurn);
         reasons.push(
-          `Büyüme hızı ~${fmtK(analysis.avgGrowthPerTurn)}/tur — compact'a ~${turnsLeft} tur kaldı`
+          `Growth ~${fmtK(analysis.avgGrowthPerTurn)}/turn — ~${turnsLeft} turns until compact`
         );
       }
     }
@@ -55,7 +55,7 @@ function makeDecision(analysis, limits, config) {
     const warn = config?.limits?.output_ratio_warn || 0.4;
     if (ratio >= warn) {
       reasons.push(
-        `Output oranı yüksek (${Math.round(ratio * 100)}%) — Claude verbose, "kısa tut" talimatı düşün`
+        `Output ratio high (${Math.round(ratio * 100)}%) — Claude is verbose, consider a "keep responses short" instruction`
       );
     }
   }
@@ -63,7 +63,7 @@ function makeDecision(analysis, limits, config) {
   if (analysis.toolUses > 30 && analysis.messageCount > 0) {
     const perMsg = analysis.toolUses / analysis.messageCount;
     if (perMsg > 4) {
-      reasons.push(`Ağır tool kullanımı (${perMsg.toFixed(1)} tool/mesaj)`);
+      reasons.push(`Heavy tool use (${perMsg.toFixed(1)} tools/message)`);
     }
   }
 
@@ -88,11 +88,11 @@ function makeDecision(analysis, limits, config) {
 
 function actionFor(level, pct, ctx) {
   switch (level) {
-    case 'critical':    return '/clear — hemen snapshot al ve temizle';
-    case 'urgent':      return 'ctx compact çalıştır ya da /snapshot + /clear';
-    case 'compact':     return 'ctx compact — tailored /compact promptu hazırlan';
-    case 'watch':       return 'Dikkatli ol, büyüme hızına dikkat';
-    case 'comfortable': return 'Rahat bölgede';
+    case 'critical':    return '/clear — snapshot first, then clear';
+    case 'urgent':      return 'Run ctx compact, or /snapshot + /clear';
+    case 'compact':     return 'ctx compact — prepare a tailored /compact prompt';
+    case 'watch':       return 'Watch the growth rate';
+    case 'comfortable': return 'Comfortable zone';
     default:            return null;
   }
 }

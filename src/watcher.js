@@ -19,15 +19,15 @@ function watchLoop(cwd, config) {
   let alertedAt  = new Set();
 
   console.log('');
-  console.log(C.bold + '  ctx watch — token % canlı izleme' + C.reset);
-  console.log(C.gray + `  interval: ${intervalMs / 1000}sn   Ctrl+C ile çık` + C.reset);
+  console.log(C.bold + '  ctx watch — live token % monitor' + C.reset);
+  console.log(C.gray + `  interval: ${intervalMs / 1000}s   Ctrl+C to exit` + C.reset);
   console.log('');
 
   const tick = () => {
     let session;
     try { session = findLatestSession(cwd); } catch { session = null; }
     if (!session) {
-      if (status) process.stdout.write(`\r  ${C.gray}(session bekleniyor...)${C.reset}   `);
+      if (status) process.stdout.write(`\r  ${C.gray}(waiting for session...)${C.reset}   `);
       return;
     }
 
@@ -74,7 +74,7 @@ function watchLoop(cwd, config) {
 
   process.on('SIGINT', () => {
     clearInterval(iv);
-    console.log('\n\n' + C.green + '  ✅ Watch durduruldu' + C.reset + '\n');
+    console.log('\n\n' + C.green + '  ✅ Watch stopped' + C.reset + '\n');
     process.exit(0);
   });
 }

@@ -20,35 +20,35 @@ function buildStrategy(analysis, decision, config) {
   const topCatLabels = topCatKeys.map(k => categories[k]?.label || k);
 
   if (topCatLabels.length) {
-    strategy.keep.push(`aktif alanlar: ${topCatLabels.join(', ')}`);
+    strategy.keep.push(`active areas: ${topCatLabels.join(', ')}`);
   }
 
   if (analysis.filesModified.size > 0) {
     const files = [...analysis.filesModified]
       .slice(-8)
       .map(f => path.basename(f));
-    strategy.keep.push(`değiştirilen dosyalar (${analysis.filesModified.size}): ${files.join(', ')}`);
-    strategy.reasoning.push(`${analysis.filesModified.size} dosya değiştirildi — context'te tutulmalı`);
+    strategy.keep.push(`modified files (${analysis.filesModified.size}): ${files.join(', ')}`);
+    strategy.reasoning.push(`${analysis.filesModified.size} files modified — keep in context`);
   }
 
   if (analysis.decisions.length) {
-    strategy.keep.push(`alınan kararlar (${analysis.decisions.length} adet)`);
-    strategy.reasoning.push('Mimari kararlar özette açıkça belirtilmeli');
+    strategy.keep.push(`architectural decisions (${analysis.decisions.length})`);
+    strategy.reasoning.push('Architectural decisions must be explicit in the summary');
   }
 
   const critTypes = [...new Set(analysis.criticalBits.map(c => c.type))];
   if (critTypes.length) {
-    strategy.keep.push(`kritik bilgiler: ${critTypes.join(', ')}`);
+    strategy.keep.push(`critical signals: ${critTypes.join(', ')}`);
   }
 
   if (analysis.lastNMessages.length) {
     const last = analysis.lastNMessages[analysis.lastNMessages.length - 1];
-    strategy.keep.push(`son görev: "${last.slice(0, 60)}"`);
+    strategy.keep.push(`last task: "${last.slice(0, 60)}"`);
   }
 
   if (analysis.failedAttempts.length) {
-    strategy.keep.push(`başarısız yaklaşımlar (${analysis.failedAttempts.length}) — tekrar deneme`);
-    strategy.reasoning.push('Başarısız denemeler özette olmazsa aynı hata tekrarlanabilir');
+    strategy.keep.push(`failed approaches (${analysis.failedAttempts.length}) — do not retry`);
+    strategy.reasoning.push('Without failed attempts in the summary, the same mistakes repeat');
   }
 
   if (analysis.largeOutputs.length) {
@@ -56,10 +56,10 @@ function buildStrategy(analysis, decision, config) {
       analysis.largeOutputs.reduce((a, b) => a + b.size, 0) / 1024
     );
     strategy.drop.push(
-      `büyük tool output'ları (${analysis.largeOutputs.length} adet, ~${totalKb}kb)`
+      `large tool outputs (${analysis.largeOutputs.length} items, ~${totalKb}kb)`
     );
     strategy.reasoning.push(
-      `Tool output'ları context'in büyük kısmını yiyor — sadece sonuçları koru`
+      `Tool outputs dominate context — keep only their conclusions`
     );
   }
 
@@ -70,7 +70,7 @@ function buildStrategy(analysis, decision, config) {
   }
   const repeated = [...repeatedPrefixes.entries()].filter(([, c]) => c > 2);
   if (repeated.length) {
-    strategy.drop.push('tekrarlayan bash çıktıları');
+    strategy.drop.push('repeated bash output');
   }
 
   strategy.compactPrompt = buildCompactPrompt(analysis, topCatLabels, strategy);
@@ -91,15 +91,15 @@ function buildCompactPrompt(analysis, topCatLabels, strategy) {
     const files = [...analysis.filesModified]
       .slice(-5)
       .map(f => path.basename(f));
-    preserve.push(`dosyalar: ${files.join(', ')}`);
+    preserve.push(`files: ${files.join(', ')}`);
   }
 
   if (analysis.decisions.length) {
-    preserve.push(`${analysis.decisions.length} mimari karar`);
+    preserve.push(`${analysis.decisions.length} architectural decisions`);
   }
 
   if (analysis.failedAttempts.length) {
-    preserve.push('başarısız denemeler');
+    preserve.push('failed attempts');
   }
 
   const critTypes = [...new Set(analysis.criticalBits.map(c => c.type))].slice(0, 3);
@@ -108,16 +108,16 @@ function buildCompactPrompt(analysis, topCatLabels, strategy) {
   }
 
   if (preserve.length) {
-    parts.push(`— koru: ${preserve.join('; ')}`);
+    parts.push(`— keep: ${preserve.join('; ')}`);
   }
 
   if (strategy.drop.length) {
-    parts.push(`— at: ${strategy.drop.slice(0, 2).join(', ')}`);
+    parts.push(`— drop: ${strategy.drop.slice(0, 2).join(', ')}`);
   }
 
   if (analysis.lastNMessages.length) {
     const last = analysis.lastNMessages[analysis.lastNMessages.length - 1];
-    parts.push(`— devam: "${last.slice(0, 60)}"`);
+    parts.push(`— continue: "${last.slice(0, 60)}"`);
   }
 
   return '/compact ' + parts.join(' ');

@@ -39,7 +39,7 @@ test('buildMarkdown contains frontmatter and required sections', () => {
   assert.match(md, /type: project/);
   assert.match(md, /Why:/);
   assert.match(md, /How to apply:/);
-  assert.match(md, /Değiştirilen dosyalar/);
+  assert.match(md, /Modified files/);
 });
 
 test('writeSnapshot writes file into temp memory dir and updates index', () => {

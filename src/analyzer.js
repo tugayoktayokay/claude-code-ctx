@@ -3,15 +3,15 @@
 const { extractText } = require('./session.js');
 
 const CRITICAL_PATTERNS = [
-  { re: /kararı?[:\s]/i,                       label: 'karar' },
-  { re: /(?:sonuç|result)[:\s]/i,              label: 'sonuç' },
-  { re: /(?:hata|error)[:\s].{10,80}/i,        label: 'hata' },
-  { re: /(?:çözüm|solution|fix)[:\s]/i,        label: 'çözüm' },
-  { re: /TODO|FIXME|HACK|NOTE/,                label: 'todo/not' },
+  { re: /(?:karar|decision)[:\s]/i,            label: 'decision' },
+  { re: /(?:sonuç|result|outcome)[:\s]/i,      label: 'result' },
+  { re: /(?:hata|error)[:\s].{10,80}/i,        label: 'error' },
+  { re: /(?:çözüm|solution|fix)[:\s]/i,        label: 'fix' },
+  { re: /TODO|FIXME|HACK|NOTE/,                label: 'todo/note' },
   { re: /migration.*(?:add|remove|alter)/i,    label: 'migration' },
   { re: /(?:port|url|endpoint)[:\s]\S+/i,      label: 'endpoint' },
   { re: /(?:env|secret|key)[:\s]\S+/i,         label: 'config' },
-  { re: /olmadı|çalışmadı|denedik|başarısız/i, label: 'başarısız deneme' },
+  { re: /olmadı|çalışmadı|denedik|başarısız|didn['t\s]*work|failed/i, label: 'failed attempt' },
 ];
 
 function categorize(text, categories, map) {

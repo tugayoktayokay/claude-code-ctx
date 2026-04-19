@@ -11,7 +11,7 @@ const { loadDefaults }   = require('../config.js');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'demo-session.jsonl');
 
-test('strategy produces a /compact prompt containing focus and koru', () => {
+test('strategy produces a /compact prompt with focus/keep/continue', () => {
   const config   = loadDefaults();
   const entries  = parseJSONL(FIXTURE);
   const analysis = analyzeEntries(entries, config);
@@ -20,7 +20,7 @@ test('strategy produces a /compact prompt containing focus and koru', () => {
   const strategy = buildStrategy(analysis, decision, config);
 
   assert.ok(strategy.compactPrompt.startsWith('/compact focus on'));
-  assert.ok(strategy.compactPrompt.includes('koru:'));
-  assert.ok(strategy.compactPrompt.includes('devam:'));
+  assert.ok(strategy.compactPrompt.includes('keep:'));
+  assert.ok(strategy.compactPrompt.includes('continue:'));
   assert.ok(strategy.keep.length > 0, 'keep sections populated');
 });

@@ -33,7 +33,7 @@ function loadConfig() {
     const user = JSON.parse(fs.readFileSync(USER_PATH, 'utf8'));
     return deepMerge(defaults, user);
   } catch (err) {
-    console.error(`⚠️  ~/.config/ctx/config.json geçersiz JSON: ${err.message} — default'lar kullanılıyor`);
+    console.error(`⚠️  ~/.config/ctx/config.json invalid JSON: ${err.message} — falling back to defaults`);
     return defaults;
   }
 }

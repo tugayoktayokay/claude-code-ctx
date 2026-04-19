@@ -85,9 +85,9 @@ function tick(cwd, config, state) {
       state.notifiedAt[key] = Date.now();
       macNotify(
         `ctx — ${decision.level}`,
-        `Context %${decision.metrics.contextPct} — ${decision.action || ''}`
+        `Context ${decision.metrics.contextPct}% — ${decision.action || ''}`
       );
-      log(`[level] ${decision.level} at %${decision.metrics.contextPct}`);
+      log(`[level] ${decision.level} at ${decision.metrics.contextPct}%`);
     }
   }
   state.lastLevel = decision.level;
@@ -96,8 +96,8 @@ function tick(cwd, config, state) {
   if (head && state.lastCommit && head !== state.lastCommit) {
     const subject = gitSubject(cwd) || head.slice(0, 8);
     macNotify(
-      'ctx — yeni commit',
-      `"${subject.slice(0, 60)}" — snapshot için iyi an`
+      'ctx — new commit',
+      `"${subject.slice(0, 60)}" — good moment for a snapshot`
     );
     log(`[git] new commit ${head.slice(0, 8)} "${subject.slice(0, 80)}"`);
   }
@@ -143,8 +143,8 @@ function start(cwd, config, { detach = true } = {}) {
   ensureDir();
   const existing = readPid();
   if (existing) {
-    console.log(C.yellow + `  ⚠️  Daemon zaten çalışıyor (pid ${existing})` + C.reset);
-    console.log(C.gray + `     Durdur: ctx daemon stop` + C.reset);
+    console.log(C.yellow + `  ⚠️  Daemon already running (pid ${existing})` + C.reset);
+    console.log(C.gray + `     Stop it with: ctx daemon stop` + C.reset);
     return 1;
   }
   try { fs.unlinkSync(PID_FILE); } catch {}
@@ -164,10 +164,10 @@ function start(cwd, config, { detach = true } = {}) {
   child.unref();
 
   console.log('');
-  console.log(C.green + `  ✓ ctx daemon başladı (pid ${child.pid})` + C.reset);
+  console.log(C.green + `  ✓ ctx daemon started (pid ${child.pid})` + C.reset);
   console.log(C.gray + `    cwd: ${cwd}` + C.reset);
   console.log(C.gray + `    log: ${LOG_FILE}` + C.reset);
-  console.log(C.gray + `    durdur: ctx daemon stop` + C.reset);
+  console.log(C.gray + `    stop: ctx daemon stop` + C.reset);
   console.log('');
   return 0;
 }
@@ -175,13 +175,13 @@ function start(cwd, config, { detach = true } = {}) {
 function stop() {
   const pid = readPid();
   if (!pid) {
-    console.log(C.gray + '  ℹ️  Çalışan daemon yok' + C.reset);
+    console.log(C.gray + '  ℹ️  No daemon running' + C.reset);
     try { fs.unlinkSync(PID_FILE); } catch {}
     return 0;
   }
   try { process.kill(pid, 'SIGTERM'); } catch {}
   try { fs.unlinkSync(PID_FILE); } catch {}
-  console.log(C.green + `  ✓ daemon durduruldu (pid ${pid})` + C.reset);
+  console.log(C.green + `  ✓ daemon stopped (pid ${pid})` + C.reset);
   return 0;
 }
 
@@ -190,17 +190,17 @@ function status() {
   const state = loadState();
   console.log('');
   if (pid) {
-    console.log(C.green + `  ✓ daemon çalışıyor (pid ${pid})` + C.reset);
+    console.log(C.green + `  ✓ daemon running (pid ${pid})` + C.reset);
   } else {
-    console.log(C.gray + '  ✗ daemon çalışmıyor' + C.reset);
+    console.log(C.gray + '  ✗ daemon not running' + C.reset);
   }
   if (state.startedAt) {
     const mins = Math.round((Date.now() - state.startedAt) / 60000);
-    console.log(C.gray + `    uptime: ${mins}dk` + C.reset);
+    console.log(C.gray + `    uptime: ${mins}m` + C.reset);
   }
   if (state.cwd)       console.log(C.gray + `    cwd: ${state.cwd}` + C.reset);
-  if (state.lastLevel) console.log(C.gray + `    son seviye: ${state.lastLevel}` + C.reset);
-  if (state.lastCommit)console.log(C.gray + `    son commit: ${state.lastCommit.slice(0, 8)}` + C.reset);
+  if (state.lastLevel) console.log(C.gray + `    last level: ${state.lastLevel}` + C.reset);
+  if (state.lastCommit)console.log(C.gray + `    last commit: ${state.lastCommit.slice(0, 8)}` + C.reset);
   console.log(C.gray + `    log: ${LOG_FILE}` + C.reset);
   console.log('');
   return pid ? 0 : 1;
@@ -208,7 +208,7 @@ function status() {
 
 function tailLog(n = 30) {
   if (!fs.existsSync(LOG_FILE)) {
-    console.log(C.gray + '  ℹ️  Log yok' + C.reset);
+    console.log(C.gray + '  ℹ️  No log yet' + C.reset);
     return 0;
   }
   const lines = fs.readFileSync(LOG_FILE, 'utf8').trim().split('\n').slice(-n);

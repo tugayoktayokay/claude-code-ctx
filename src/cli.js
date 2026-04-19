@@ -35,21 +35,21 @@ function printHelp() {
 ctx — Claude Code context manager (zero deps)
 
 Commands:
-  ctx                          Aktif session'ı analiz et (özet + öneri)
-  ctx watch                    Canlı token % monitor + macOS notif (foreground)
-  ctx daemon start|stop|status|log   Arka plan izleme + git commit notif
-  ctx compact                  /compact prompt üret + clipboard
-  ctx snapshot [--name NAME]   Memory'e session özeti yaz
-  ctx history [N]              Son N session (default 10)
-  ctx config                   Config path göster, yoksa oluştur
-  ctx file <path>              Belirli JSONL'i analiz et
-  ctx --help                   Bu yardım
+  ctx                                Analyze current session (summary + recommendation)
+  ctx watch                          Live token % monitor in foreground
+  ctx daemon start|stop|status|log   Background watcher + git commit notifications
+  ctx compact                        Build tailored /compact prompt, copy to clipboard
+  ctx snapshot [--name NAME]         Write session summary into your memory dir
+  ctx history [N]                    Last N sessions (default 10)
+  ctx config                         Show / create config file
+  ctx file <path>                    Analyze a specific JSONL file
+  ctx --help                         This help
 
-Context thresholds (quality ceiling üzerinden):
+Context thresholds (measured against the model's quality ceiling):
   0-20%   ✅ comfortable
   20-40%  👀 watch
-  40-55%  ⚠️  compact zamanı yaklaşıyor
-  55-75%  ⚠️  compact öneri
+  40-55%  ⚠️  compact approaching
+  55-75%  ⚠️  compact recommended
   75-90%  🔴 urgent
   90+%    🚨 critical
 
@@ -75,8 +75,8 @@ function runAnalyze(args, config) {
 
   if (!session) {
     console.log('');
-    console.log(C.yellow + '  ⚠️  Aktif Claude Code session bulunamadı' + C.reset);
-    console.log(C.gray + '     Claude Code çalışıyor mu? ya da: ctx file <jsonl-path>' + C.reset);
+    console.log(C.yellow + '  ⚠️  No active Claude Code session found' + C.reset);
+    console.log(C.gray + '     Is Claude Code running? Or try: ctx file <jsonl-path>' + C.reset);
     console.log('');
     return 1;
   }
@@ -98,7 +98,7 @@ function runCompact(args, config) {
   const session = loadSession(sessionPath, cwd);
 
   if (!session) {
-    console.error('❌ Aktif session yok');
+    console.error('❌ No active session');
     return 1;
   }
 
@@ -125,7 +125,7 @@ function runSnapshot(args, config) {
 
   const session = loadSession(sessionPath, cwd);
   if (!session) {
-    console.error('❌ Aktif session yok');
+    console.error('❌ No active session');
     return 1;
   }
 
@@ -154,7 +154,7 @@ function runHistory(args, config) {
   const sessions = listAllSessions().slice(0, n);
 
   if (!sessions.length) {
-    console.log(C.gray + '  Session bulunamadı' + C.reset);
+    console.log(C.gray + '  No sessions found' + C.reset);
     return 0;
   }
 
@@ -195,10 +195,10 @@ function runConfig(_args, _config) {
   const created = !fs.existsSync(USER_PATH);
   ensureUserConfig();
   console.log('');
-  console.log(`  ${created ? C.green + '✓ Oluşturuldu:' : '📄 Config:'}${C.reset} ${USER_PATH}`);
+  console.log(`  ${created ? C.green + '✓ Created:' : '📄 Config:'}${C.reset} ${USER_PATH}`);
   console.log(C.gray + `  default:      ${DEFAULT_PATH}` + C.reset);
   console.log('');
-  console.log(C.dim + '  Düzenle: $EDITOR ~/.config/ctx/config.json' + C.reset);
+  console.log(C.dim + '  Edit: $EDITOR ~/.config/ctx/config.json' + C.reset);
   console.log('');
   return 0;
 }
@@ -213,7 +213,7 @@ function runDaemon(args, config) {
     case 'log':     return daemon.tailLog(parseInt(args[1], 10) || 30);
     case '__run__': daemon.runLoop(args[1] || process.cwd(), config); return 0;
     default:
-      console.error(`❌ Bilinmeyen daemon komutu: ${sub}`);
+      console.error(`❌ Unknown daemon subcommand: ${sub}`);
       console.error(`   ctx daemon start|stop|status|log`);
       return 1;
   }
@@ -222,7 +222,7 @@ function runDaemon(args, config) {
 function runFile(args, config) {
   stripColor();
   if (!args[0]) {
-    console.error('❌ ctx file <path> — yol gerekli');
+    console.error('❌ ctx file <path> — path required');
     return 1;
   }
   return runAnalyze([args[0]], config);
@@ -260,7 +260,7 @@ function main(argv) {
       if (cmd && !cmd.startsWith('-') && fs.existsSync(path.resolve(cmd))) {
         return runAnalyze([cmd], config);
       }
-      console.error(`❌ Bilinmeyen komut: ${cmd}`);
+      console.error(`❌ Unknown command: ${cmd}`);
       printHelp();
       return 1;
   }

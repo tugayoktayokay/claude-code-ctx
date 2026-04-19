@@ -40,7 +40,7 @@ function buildMarkdown(analysis, decision, strategy, options) {
 
   const description = [
     topLabels.slice(0, 2).join(' + ') || 'session snapshot',
-    lastIntent ? `son: "${lastIntent.slice(0, 50)}"` : null,
+    lastIntent ? `last: "${lastIntent.slice(0, 50)}"` : null,
   ].filter(Boolean).join(' — ');
 
   const filesList = [...analysis.filesModified]
@@ -59,15 +59,15 @@ function buildMarkdown(analysis, decision, strategy, options) {
   const critBits = [...new Set(analysis.criticalBits.map(c => c.type))].join(', ');
 
   const whyLine = topLabels.length
-    ? `Aktif konular: ${topLabels.join(', ')}.`
-    : `Session devamlılığı için kaydedildi.`;
+    ? `Active topics: ${topLabels.join(', ')}.`
+    : `Saved for session continuity.`;
 
   const howLine = [
     analysis.filesModified.size
-      ? `${analysis.filesModified.size} dosya değişti, devam ederken bunlara bak`
+      ? `${analysis.filesModified.size} files modified — reference them when continuing`
       : null,
-    lastIntent ? `son görev: "${lastIntent.slice(0, 60)}"` : null,
-    analysis.failedAttempts.length ? 'başarısız denemeleri tekrar etme' : null,
+    lastIntent ? `last task: "${lastIntent.slice(0, 60)}"` : null,
+    analysis.failedAttempts.length ? 'do not repeat failed attempts' : null,
   ].filter(Boolean).join('; ');
 
   const sections = [];
@@ -79,51 +79,51 @@ function buildMarkdown(analysis, decision, strategy, options) {
   if (modelId)   sections.push(`model: ${modelId}`);
   sections.push(`---`);
   sections.push(``);
-  sections.push(`Devam eden iş (${today}):`);
+  sections.push(`In-progress work (${today}):`);
   sections.push(``);
 
   if (lastIntent) {
-    sections.push(`**Son görev:** "${lastIntent.slice(0, 160)}"`);
+    sections.push(`**Last task:** "${lastIntent.slice(0, 160)}"`);
     sections.push(``);
   }
 
   if (filesList) {
-    sections.push(`**Değiştirilen dosyalar (${analysis.filesModified.size}):**`);
+    sections.push(`**Modified files (${analysis.filesModified.size}):**`);
     sections.push(filesList);
     sections.push(``);
   }
 
   if (decisions) {
-    sections.push(`**Alınan kararlar:**`);
+    sections.push(`**Decisions made:**`);
     sections.push(decisions);
     sections.push(``);
   }
 
   if (failed) {
-    sections.push(`**Başarısız / açık sorular:**`);
+    sections.push(`**Failed attempts / open questions:**`);
     sections.push(failed);
     sections.push(``);
   }
 
   if (critBits) {
-    sections.push(`**Kritik bilgi tipleri:** ${critBits}`);
+    sections.push(`**Critical signal types:** ${critBits}`);
     sections.push(``);
   }
 
   sections.push(`**Context snapshot:**`);
   sections.push(
-    `- ${decision.metrics.contextPct}% of ${kFmt(decision.metrics.qualityCeiling)} (${kFmt(decision.metrics.contextTokens)} token)`
+    `- ${decision.metrics.contextPct}% of ${kFmt(decision.metrics.qualityCeiling)} (${kFmt(decision.metrics.contextTokens)} tokens)`
   );
   sections.push(
-    `- ${analysis.messageCount} mesaj, ${analysis.toolUses} tool çağrısı, ${analysis.filesModified.size} dosya değişti`
+    `- ${analysis.messageCount} messages, ${analysis.toolUses} tool calls, ${analysis.filesModified.size} files modified`
   );
   if (analysis.avgGrowthPerTurn > 0) {
-    sections.push(`- Büyüme ~${kFmt(analysis.avgGrowthPerTurn)}/tur`);
+    sections.push(`- Growth ~${kFmt(analysis.avgGrowthPerTurn)}/turn`);
   }
   sections.push(``);
 
   sections.push(`**Why:** ${whyLine}`);
-  sections.push(`**How to apply:** ${howLine || 'bu session kaldığı yerden devam edilecek'}`);
+  sections.push(`**How to apply:** ${howLine || 'continue this session from where it left off'}`);
   sections.push(``);
 
   return sections.join('\n');
@@ -195,7 +195,7 @@ function writeSnapshot(analysis, decision, strategy, options) {
     const lastIntent = analysis.lastNMessages[analysis.lastNMessages.length - 1] || '';
     const idxDesc = [
       top.slice(0, 2).join(' + ') || 'snapshot',
-      lastIntent ? `son: "${lastIntent.slice(0, 40)}"` : null,
+      lastIntent ? `last: "${lastIntent.slice(0, 40)}"` : null,
     ].filter(Boolean).join(' — ');
     indexUpdated = updateIndex(indexPath, filename, idxDesc);
   }
