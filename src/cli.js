@@ -426,6 +426,17 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runTimeline(_args, config) {
+  stripColor();
+  const cwd = process.cwd();
+  const { buildThreads } = require('./timeline.js');
+  const { printTimeline } = require('./output.js');
+  const memoryDir = resolveMemoryDir(cwd, config);
+  const threads = buildThreads(memoryDir);
+  printTimeline(threads);
+  return 0;
+}
+
 function runAsk(args, config) {
   stripColor();
   const cwd = process.cwd();
@@ -604,6 +615,8 @@ function main(argv) {
       return runHook(rest, config);
     case 'ask':
       return runAsk(rest, config);
+    case 'timeline':
+      return runTimeline(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':

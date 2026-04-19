@@ -233,6 +233,23 @@ module.exports = {
   printSnapshotResult,
   printHistory,
   printRetrieval,
+  printTimeline,
   timeAgo,
   macNotify,
 };
+
+function printTimeline(threads) {
+  console.log('');
+  console.log(C.bold + `  ctx timeline — ${threads.length} thread(s)` + C.reset);
+  console.log('');
+  for (let i = 0; i < threads.length; i++) {
+    const thread = threads[i];
+    const last = thread[thread.length - 1];
+    console.log(C.cyan + `  ▸ thread #${i + 1} (${thread.length} snapshots, last: ${timeAgo(last.mtime)})` + C.reset);
+    for (const snap of thread) {
+      const cats = (snap.categories || []).join(', ') || '-';
+      console.log(`    ${C.gray}${new Date(snap.mtime).toISOString().slice(0, 10)}${C.reset}  ${snap.name}  ${C.dim}[${cats}]${C.reset}`);
+    }
+    console.log('');
+  }
+}
