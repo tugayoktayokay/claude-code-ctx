@@ -2,7 +2,7 @@
 
 const fs     = require('fs');
 const path   = require('path');
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const { makeQuery } = require('./query.js');
 const {
   collectProjectCandidates,
@@ -167,36 +167,90 @@ const wrapperTools = [
       },
       required: ['command'],
     },
-    handler: async (args, { config: _config }) => {
+    handler: async (args, { config: _config, signal, sendProgress } = {}) => {
       const command    = String(args.command || '');
       const cwd        = args.cwd || process.cwd();
       const limitBytes = parseByteLimit(args.limit_bytes, 5000);
       const timeoutMs  = args.timeout_ms || 30000;
 
-      const result = spawnSync(command, {
-        shell: true,
-        cwd,
-        timeout: timeoutMs,
-        maxBuffer: 50 * 1024 * 1024,
-        encoding: 'utf8',
+      return new Promise((resolve) => {
+        const child = spawn(command, {
+          shell: true,
+          cwd,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+        let cancelled = false;
+        let timedOut = false;
+
+        const timer = setTimeout(() => {
+          timedOut = true;
+          try { child.kill('SIGTERM'); } catch {}
+          setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, 2000);
+        }, timeoutMs);
+
+        const onAbort = () => {
+          cancelled = true;
+          try { child.kill('SIGTERM'); } catch {}
+          setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, 2000);
+        };
+        if (signal) {
+          if (signal.aborted) onAbort();
+          else signal.addEventListener('abort', onAbort);
+        }
+
+        const progressTimer = sendProgress ? setInterval(() => {
+          sendProgress(stdout.length + stderr.length);
+        }, 1000) : null;
+
+        child.stdout.on('data', (c) => {
+          stdout += c.toString();
+          if (stdout.length > 50 * 1024 * 1024) {
+            try { child.kill('SIGTERM'); } catch {}
+          }
+        });
+        child.stderr.on('data', (c) => { stderr += c.toString(); });
+
+        child.on('close', (code, sig) => {
+          clearTimeout(timer);
+          if (progressTimer) clearInterval(progressTimer);
+          if (signal) { try { signal.removeEventListener('abort', onAbort); } catch {} }
+
+          const combined = stderr ? `${stdout}\n--- stderr ---\n${stderr}` : stdout;
+          const status = cancelled ? 'cancelled'
+                       : timedOut  ? 'timeout'
+                       : sig       ? `signal ${sig}`
+                       : code == null ? 'killed'
+                       : `exit ${code}`;
+
+          if (cancelled) {
+            resolve(okText('cancelled'));
+            return;
+          }
+
+          if (combined.length <= limitBytes) {
+            resolve(okText(`[ctx_shell ${status}, ${combined.length}B]\n${combined}`));
+            return;
+          }
+
+          const cached = cache.writeCache(combined);
+          const summary = cache.summarizeLines(combined, { head: 25, tail: 10 });
+          resolve(okText([
+            `[ctx_shell ${status}, ${combined.length}B → summarized]`,
+            `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 limit=4000 to read chunks)`,
+            '',
+            summary,
+          ].join('\n')));
+        });
+
+        child.on('error', (err) => {
+          clearTimeout(timer);
+          if (progressTimer) clearInterval(progressTimer);
+          resolve(okText(`error: ${err.message}`));
+        });
       });
-      const stdout = result.stdout || '';
-      const stderr = result.stderr || '';
-      const combined = stderr ? `${stdout}\n--- stderr ---\n${stderr}` : stdout;
-      const status = result.status == null ? 'killed' : `exit ${result.status}`;
-
-      if (combined.length <= limitBytes) {
-        return okText(`[ctx_shell ${status}, ${combined.length}B]\n${combined}`);
-      }
-
-      const cached = cache.writeCache(combined);
-      const summary = cache.summarizeLines(combined, { head: 25, tail: 10 });
-      return okText([
-        `[ctx_shell ${status}, ${combined.length}B → summarized]`,
-        `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 limit=4000 to read chunks)`,
-        '',
-        summary,
-      ].join('\n'));
     },
   },
   {
