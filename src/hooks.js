@@ -207,10 +207,9 @@ function handleUserPromptSubmit(input, config) {
   }
 
   if (!auto.enabled) return { output: null, exitCode: 0 };
-  if (!pipe) return { output: null, exitCode: 0 };
-  const turns = pipe.analysis.userMessages || 0;
-  if (turns > (auto.max_turns ?? 2)) return { output: null, exitCode: 0 };
   if (!prompt) return { output: null, exitCode: 0 };
+  const turns = pipe?.analysis?.userMessages || 0;
+  if (turns > (auto.max_turns ?? 2)) return { output: null, exitCode: 0 };
 
   const { makeQuery } = require('./query.js');
   const { collectProjectCandidates, collectAllProjectsCandidates, rank } = require('./retrieval.js');

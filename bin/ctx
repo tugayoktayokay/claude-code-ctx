@@ -2,5 +2,15 @@
 'use strict';
 
 const { main } = require('../src/cli.js');
-const code = main(process.argv);
-if (typeof code === 'number') process.exitCode = code;
+const result = main(process.argv);
+
+if (result && typeof result.then === 'function') {
+  result.then((code) => {
+    if (typeof code === 'number') process.exitCode = code;
+  }).catch((err) => {
+    console.error(err && err.stack ? err.stack : err);
+    process.exitCode = 1;
+  });
+} else if (typeof result === 'number') {
+  process.exitCode = result;
+}

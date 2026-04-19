@@ -37,6 +37,10 @@ function extractCritical(text, arr) {
 function analyzeEntries(entries, config) {
   const categories = config?.categories || {};
   const growthWindow = config?.limits?.growth_window || 5;
+  const maxEntries = config?.limits?.max_entries;
+  if (typeof maxEntries === 'number' && maxEntries > 0 && entries.length > maxEntries) {
+    entries = entries.slice(-maxEntries);
+  }
 
   const analysis = {
     messageCount: 0,

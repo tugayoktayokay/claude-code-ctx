@@ -5,11 +5,10 @@ const path = require('path');
 const os   = require('os');
 const { execFileSync, spawn } = require('child_process');
 
-const { findLatestSession, parseJSONL } = require('./session.js');
-const { analyzeEntries } = require('./analyzer.js');
-const { makeDecision }   = require('./decision.js');
-const { detectModel, getLimits } = require('./models.js');
+const { runAnalyze }     = require('./pipeline.js');
 const { macNotify, C }   = require('./output.js');
+const { writeSnapshot }  = require('./snapshot.js');
+const backupMod          = require('./backup.js');
 
 const STATE_DIR  = path.join(os.homedir(), '.config', 'ctx');
 const PID_FILE   = path.join(STATE_DIR, 'daemon.pid');
@@ -65,18 +64,11 @@ function gitSubject(cwd) {
 }
 
 function tick(cwd, config, state) {
-  let session;
-  try { session = findLatestSession(cwd); } catch { return; }
-  if (!session) return;
+  let pipe;
+  try { pipe = runAnalyze({ cwd, config }); } catch { return; }
+  if (!pipe || !pipe.entries.length) return;
 
-  let entries;
-  try { entries = parseJSONL(session.path); } catch { return; }
-  if (!entries.length) return;
-
-  const analysis = analyzeEntries(entries, config);
-  const modelId  = detectModel(entries);
-  const limits   = getLimits(modelId, config);
-  const decision = makeDecision(analysis, limits, config);
+  const { decision } = pipe;
 
   if (decision.level !== state.lastLevel && ['compact', 'urgent', 'critical'].includes(decision.level)) {
     const key = `level:${decision.level}`;
@@ -102,6 +94,41 @@ function tick(cwd, config, state) {
     log(`[git] new commit ${head.slice(0, 8)} "${subject.slice(0, 80)}"`);
   }
   if (head) state.lastCommit = head;
+
+  const autoLevels = config?.daemon?.auto_snapshot_on || [];
+  if (autoLevels.includes(decision.level)) {
+    try {
+      const result = writeSnapshot(pipe.analysis, pipe.decision, pipe.strategy, {
+        cwd,
+        config,
+        sessionId: pipe.sessionId,
+        modelId: pipe.modelId,
+        trigger: `daemon:${decision.level}`,
+      });
+      log(`[auto-snapshot] level=${decision.level} dedup=${result.dedupHit} file=${result.filename || '-'}`);
+    } catch (err) {
+      log(`[auto-snapshot] error: ${err.message}`);
+    }
+  }
+
+  const backupLevels = config?.daemon?.auto_backup_on || [];
+  if (backupLevels.includes(decision.level) && pipe.session?.path) {
+    const inFlightKey = pipe.sessionId || 'unknown';
+    state.backupInFlight = state.backupInFlight || {};
+    if (!state.backupInFlight[inFlightKey]) {
+      state.backupInFlight[inFlightKey] = true;
+      backupMod.writeBackup(pipe.session.path, cwd, pipe.sessionId, config)
+        .then((r) => log(`[auto-backup] path=${r.path} size=${r.size}`))
+        .catch((err) => log(`[auto-backup] error: ${err.message}`))
+        .finally(() => {
+          try {
+            const s = loadState();
+            if (s.backupInFlight) delete s.backupInFlight[inFlightKey];
+            saveState(s);
+          } catch {}
+        });
+    }
+  }
 }
 
 function runLoop(cwd, config) {

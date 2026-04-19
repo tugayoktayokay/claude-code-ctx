@@ -60,6 +60,20 @@ function findLatestSession(cwd) {
   return sessions[0];
 }
 
+function findSessionById(cwd, sessionId) {
+  if (!sessionId) return null;
+  const projDir = projectDirFor(cwd);
+  const roots = fs.existsSync(projDir) ? [projDir] : [CLAUDE_DIR];
+  for (const root of roots) {
+    const sessions = scanJSONL(root);
+    for (const s of sessions) {
+      const base = path.basename(s.path, '.jsonl');
+      if (base === sessionId || base.startsWith(sessionId)) return s;
+    }
+  }
+  return null;
+}
+
 function listAllSessions() {
   if (!fs.existsSync(CLAUDE_DIR)) return [];
   const sessions = scanJSONL(CLAUDE_DIR);
@@ -74,5 +88,6 @@ module.exports = {
   parseJSONL,
   extractText,
   findLatestSession,
+  findSessionById,
   listAllSessions,
 };
