@@ -24,7 +24,7 @@ Existing tooling doesn't surface this:
 
 1. **Model-aware quality ceiling.** Opus 4's 1M is the technical max; 200k is where quality ceiling kicks in. `ctx` thresholds fire against the ceiling, not the max. Haiku gets 100k. Override per-model in config.
 2. **Tailored `/compact` prompts.** `ctx compact` reads your session, detects categories (schema / api / auth / bug / etc.), extracts critical signals (decisions, failed attempts, endpoints, errors), and generates a ready-to-paste prompt like:
-   > `/compact focus on API routes + DB/Schema — koru: files: petitions.ts, schema.prisma; 2 architecture decisions; failed attempts — devam: "now wire the stripe webhook"`
+   > `/compact focus on API routes + DB/Schema — keep: files: petitions.ts, schema.prisma; 2 architectural decisions; failed attempts — continue: "now wire the stripe webhook"`
 3. **Standalone.** No plugin, no hooks, no agent-sdk. Runs in a side terminal or as a background daemon. Your Claude Code session doesn't know it exists.
 4. **Zero deps.** Pure Node built-ins. 1600 lines. Readable in one sitting.
 
@@ -33,7 +33,7 @@ Existing tooling doesn't surface this:
 ## Install
 
 ```bash
-npm install -g @tugayoktayokay/claude-ctx
+npm install -g noospire-ctx
 ctx --help
 ```
 
@@ -48,7 +48,7 @@ ctx --help
 
 Requires Node 18+. No transitive dependencies — the package has nothing in `dependencies` or `devDependencies`.
 
-> The CLI command is `ctx`. The npm package is scoped (`@tugayoktayokay/claude-ctx`) because the bare `ctx` and `claude-ctx` names were taken by unrelated packages.
+> The CLI command is `ctx`. The npm package is `noospire-ctx` because the bare `ctx` and `claude-ctx` names are taken or blocked by npm's typo-squatting policy.
 
 ---
 
@@ -75,22 +75,22 @@ Reads the most recent JSONL under `~/.claude/projects/<encoded-cwd>/` and prints
   ⚠️  COMPACT
   model: claude-opus-4-7
 
-  Metrikler:
-    Mesaj         : 75
-    Tool kullanımı: 71
-    Dosya değişim : 20
-    Output toplamı: 183.7k token
+  Metrics:
+    Messages  : 75
+    Tool calls: 71
+    Files     : 20
+    Output    : 183.7k tokens
 
-  Analiz:
-    • Context 54% of 200.0k quality ceiling (108.1k token)
-    • Model limit: 1.0M, but quality düşüşü 200.0k'dan sonra başlar
+  Analysis:
+    • Context 54% of 200.0k quality ceiling (108.1k tokens)
+    • Model max: 1.0M, but quality degrades past 200.0k
 
-  ✓ Özette tut:
-    • aktif alanlar: Tests, Infra/DevOps, Bug fix, AI integration
-    • değiştirilen dosyalar (20): …
-    • son görev: "now wire the stripe webhook"
+  ✓ Keep in compact:
+    • active areas: Tests, Infra/DevOps, Bug fix, AI integration
+    • modified files (20): …
+    • last task: "now wire the stripe webhook"
 
-  ➜ ctx compact — tailored /compact promptu hazırlan
+  ➜ ctx compact — prepare a tailored /compact prompt
 ```
 
 ### `ctx compact` — tailored prompt
@@ -98,11 +98,11 @@ Reads the most recent JSONL under `~/.claude/projects/<encoded-cwd>/` and prints
 The payoff command. `ccusage` tells you 150k tokens are gone; `ctx compact` tells you *what* those tokens were and writes the prompt that preserves the important parts:
 
 ```
-  /compact prompt (kopyala-yapıştır):
+  /compact prompt (copy + paste):
 
-  /compact focus on API routes + DB/Schema + Bug fix — koru: dosyalar: petitions.ts, schema.prisma, petitions.test.ts, auth.ts; 2 mimari karar; başarısız denemeler; karar, endpoint, başarısız deneme — devam: "şimdi stripe webhook handler'ı ekleyelim petition için"
+  /compact focus on API routes + DB/Schema + Bug fix — keep: files: petitions.ts, schema.prisma, petitions.test.ts, auth.ts; 2 architectural decisions; failed attempts; decision, endpoint, failed attempt — continue: "now wire the stripe webhook"
 
-  ✓ Clipboard'a kopyalandı
+  ✓ Copied to clipboard
 ```
 
 Paste it straight into Claude Code. The structure tells Claude what to focus on, what to preserve, what to drop, and what you were about to do next.
