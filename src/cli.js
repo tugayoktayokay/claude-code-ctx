@@ -384,30 +384,43 @@ function runStatus(_args, config) {
   console.log(`    ${C.gray}user:   ${C.reset} ${USER_PATH}${fs.existsSync(USER_PATH) ? '' : C.gray + ' (not created)' + C.reset}`);
   console.log('');
 
-  // hooks + plugin detection
-  let hooksLabel = C.gray + 'not installed' + C.reset;
-  let pluginLabel = C.gray + 'not detected' + C.reset;
+  // installation detection — plugin has priority
+  let pluginInstalled = null;
+  try {
+    const os = require('os');
+    const regPath = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+    if (fs.existsSync(regPath)) {
+      const reg = JSON.parse(fs.readFileSync(regPath, 'utf8'));
+      const plugins = reg?.plugins || {};
+      for (const key of Object.keys(plugins)) {
+        if (key.startsWith('ctx@') || key === 'ctx') {
+          const entries = plugins[key];
+          const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
+          pluginInstalled = { key, version: latest?.version, path: latest?.installPath };
+          break;
+        }
+      }
+    }
+  } catch {}
+
+  let manualHooksCount = 0;
   try {
     const settings = hooksInstall.readSettings();
-    const events = hooksInstall.listInstalledEvents(settings);
-    if (events.length) {
-      hooksLabel = C.green + `installed via ctx setup (${events.length} events)` + C.reset;
+    manualHooksCount = hooksInstall.listInstalledEvents(settings).length;
+  } catch {}
+
+  console.log(C.dim + '  Installation:' + C.reset);
+  if (pluginInstalled) {
+    console.log(`    ${C.green}✓ plugin${C.reset}  ${pluginInstalled.key} v${pluginInstalled.version || '?'}`);
+    console.log(C.gray + `             ${pluginInstalled.path}` + C.reset);
+    if (manualHooksCount) {
+      console.log(`    ${C.yellow}⚠ also found manual hooks (${manualHooksCount}) — run 'ctx uninstall-hooks' to avoid double-firing${C.reset}`);
     }
-  } catch (err) {
-    hooksLabel = C.red + `settings.json error: ${err.message}` + C.reset;
+  } else if (manualHooksCount) {
+    console.log(`    ${C.green}✓ manual${C.reset}  ctx setup hooks (${manualHooksCount} events)`);
+  } else {
+    console.log(`    ${C.yellow}⚠ not installed${C.reset}  — 'ctx setup' OR '/plugin install ctx@claude-code-ctx'`);
   }
-  const pluginManifest = path.resolve(__dirname, '..', '.claude-plugin', 'plugin.json');
-  if (fs.existsSync(pluginManifest)) {
-    try {
-      const p = JSON.parse(fs.readFileSync(pluginManifest, 'utf8'));
-      pluginLabel = C.green + `v${p.version || '?'} (${pluginManifest})` + C.reset;
-    } catch {}
-  }
-  console.log(C.dim + '  Hooks (manual install):' + C.reset);
-  console.log(`    ${C.gray}status:  ${C.reset}${hooksLabel}`);
-  console.log(C.dim + '  Plugin manifest:' + C.reset);
-  console.log(`    ${C.gray}status:  ${C.reset}${pluginLabel}`);
-  console.log(C.dim + `    install via: /plugin install file://${path.dirname(path.dirname(pluginManifest))}` + C.reset);
   console.log('');
 
   // daemon

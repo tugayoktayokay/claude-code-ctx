@@ -62,11 +62,38 @@ function checkConfig() {
   return out;
 }
 
+function checkPluginRegistration() {
+  const installedPath = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+  if (!fs.existsSync(installedPath)) return null;
+  try {
+    const reg = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
+    const plugins = reg?.plugins || {};
+    for (const key of Object.keys(plugins)) {
+      if (key.startsWith('ctx@') || key === 'ctx') {
+        const entries = plugins[key];
+        const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
+        return { ...CHECKS.ok, label: 'Plugin install', detail: `${key} v${latest?.version || '?'} (${latest?.installPath || 'unknown'})` };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function checkHooksInstalled(cwdBinary) {
   const out = [];
+
+  const plugin = checkPluginRegistration();
+  if (plugin) {
+    out.push(plugin);
+    out.push({ ...CHECKS.info, label: 'Manual hooks', detail: 'not needed (plugin provides them)' });
+    return out;
+  }
+
   const settingsPath = hooksInstall.defaultSettingsPath();
   if (!fs.existsSync(settingsPath)) {
-    out.push({ ...CHECKS.warn, label: 'Claude Code settings', detail: `not found: ${settingsPath} — run 'ctx setup'` });
+    out.push({ ...CHECKS.warn, label: 'Claude Code settings', detail: `not found: ${settingsPath} — run 'ctx setup' or install as plugin` });
     return out;
   }
   let settings;
@@ -79,7 +106,7 @@ function checkHooksInstalled(cwdBinary) {
   const installed = hooksInstall.listInstalledEvents(settings);
   const expected  = Object.keys(CTX_HOOK_EVENTS);
   if (!installed.length) {
-    out.push({ ...CHECKS.warn, label: 'Hooks', detail: `not installed — run 'ctx setup'` });
+    out.push({ ...CHECKS.warn, label: 'Hooks', detail: `not installed — run 'ctx setup' or install as plugin` });
     return out;
   }
   const missing = expected.filter(e => !installed.includes(e));
