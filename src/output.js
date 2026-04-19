@@ -235,9 +235,31 @@ module.exports = {
   printRetrieval,
   printTimeline,
   printDiff,
+  printStats,
   timeAgo,
   macNotify,
 };
+
+function printStats(stats) {
+  console.log('');
+  console.log(C.bold + `  ctx stats — last ${stats.rangeDays} days` + C.reset);
+  console.log('');
+  console.log(`    Snapshots: ${C.green}${stats.snapshots}${C.reset}`);
+  console.log('');
+  console.log(C.dim + '  Triggers:' + C.reset);
+  const trigEntries = Object.entries(stats.triggers);
+  if (!trigEntries.length) console.log(C.gray + '    (none)' + C.reset);
+  for (const [k, v] of trigEntries) {
+    console.log(`    ${C.gray}${k.padEnd(20)}${C.reset} ${v}`);
+  }
+  console.log('');
+  console.log(C.dim + '  Top categories:' + C.reset);
+  if (!stats.topCategories.length) console.log(C.gray + '    (none)' + C.reset);
+  for (const c of stats.topCategories) {
+    console.log(`    ${C.gray}${c.name.padEnd(20)}${C.reset} ${c.count}`);
+  }
+  console.log('');
+}
 
 function printDiff(delta) {
   console.log('');

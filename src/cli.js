@@ -426,6 +426,22 @@ function buildInjectionBlock(snap) {
   ].join('\n');
 }
 
+function runStats(args, config) {
+  stripColor();
+  let rangeDays = 7;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--week') rangeDays = 7;
+    else if (args[i] === '--month') rangeDays = 30;
+    else if (args[i] === '--days' && args[i + 1]) { rangeDays = Number(args[i + 1]); i++; }
+  }
+  const cwd = process.cwd();
+  const { aggregate } = require('./stats.js');
+  const { printStats } = require('./output.js');
+  const memoryDir = resolveMemoryDir(cwd, config);
+  printStats(aggregate(memoryDir, { rangeDays }));
+  return 0;
+}
+
 function runDiff(args, config) {
   stripColor();
   if (args.length < 2) {
@@ -640,6 +656,8 @@ function main(argv) {
       return runTimeline(rest, config);
     case 'diff':
       return runDiff(rest, config);
+    case 'stats':
+      return runStats(rest, config);
     case 'status':
       return runStatus(rest, config);
     case 'setup':
