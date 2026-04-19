@@ -95,6 +95,36 @@ test('stop: respects stop_hook_active loop guard', async () => {
   assert.equal(res.exitCode, 0);
 });
 
+test('stop: auto-copies tailored /compact prompt to clipboard at threshold', async () => {
+  const cfg = configWithDirs();
+  cfg.hooks.stop = { snapshot_on: [], backup_on: [], clipboard_compact_on: ['urgent', 'critical'] };
+
+  const pipeMock = require('../pipeline.js');
+  const original = pipeMock.runAnalyze;
+  const copied = [];
+  const strategyMod = require('../strategy.js');
+  const origCopy = strategyMod.copyToClipboard;
+  strategyMod.copyToClipboard = (text) => { copied.push(text); return true; };
+
+  pipeMock.runAnalyze = () => ({
+    analysis: { userMessages: 5 },
+    decision: { metrics: { contextPct: 80, contextTokens: 160000 }, level: 'urgent' },
+    strategy: { compactPrompt: '/compact focus on X — keep: files A,B' },
+    session: { path: '/tmp/s', entries: [{}] },
+    entries: [{}],
+    modelId: 'x', sessionId: 's', limits: {},
+  });
+
+  try {
+    await handleStop({ cwd: '/tmp/clip' }, cfg);
+    assert.equal(copied.length, 1, 'copyToClipboard invoked once');
+    assert.match(copied[0], /\/compact focus/);
+  } finally {
+    pipeMock.runAnalyze = original;
+    strategyMod.copyToClipboard = origCopy;
+  }
+});
+
 test('stop: writes snapshot when level matches snapshot_on', async () => {
   const base = tmpMemoryDir();
   const memoryDir = path.join(base, 'memory');

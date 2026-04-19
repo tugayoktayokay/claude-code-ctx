@@ -75,7 +75,7 @@
   },
   "hooks": {
     "session_start": { "restore_latest": true, "max_bytes": 8192 },
-    "stop":          { "snapshot_on": ["urgent", "critical"], "backup_on": ["critical"] },
+    "stop":          { "snapshot_on": ["urgent", "critical"], "backup_on": ["critical"], "clipboard_compact_on": ["compact", "urgent", "critical"] },
     "pre_compact":   { "inject_guidance": true, "respect_user_input": true },
     "pre_tool_use": {
       "enabled": true,

@@ -85,6 +85,17 @@ async function handleStop(input, config) {
 
   const snapshotOn = config?.hooks?.stop?.snapshot_on || [];
   const backupOn   = config?.hooks?.stop?.backup_on   || [];
+  const clipboardOn = config?.hooks?.stop?.clipboard_compact_on || [];
+
+  if (clipboardOn.includes(pipe.decision.level)) {
+    try {
+      const { copyToClipboard } = require('./strategy.js');
+      const prompt = pipe.strategy?.compactPrompt;
+      if (prompt && copyToClipboard(prompt)) {
+        logHook(config, `stop clipboard_compact level=${pipe.decision.level} prompt_len=${prompt.length}`);
+      }
+    } catch (err) { logHook(config, `stop clipboard_compact ERROR: ${err.message}`); }
+  }
 
   const tasks = [];
   if (snapshotOn.includes(pipe.decision.level)) {
@@ -242,7 +253,12 @@ function handleUserPromptSubmit(input, config) {
 
   if (warnOn.length && pipe) {
     if (warnOn.includes(pipe.decision.level)) {
-      const msg = `[ctx] context ${pipe.decision.metrics.contextPct}% of quality ceiling — consider /compact`;
+      const clipboardOn = config?.hooks?.stop?.clipboard_compact_on || [];
+      const hasPrompt = clipboardOn.includes(pipe.decision.level);
+      const tail = hasPrompt
+        ? ' — a tailored /compact prompt is already in your clipboard, paste after /compact'
+        : ' — consider /compact';
+      const msg = `[ctx] context ${pipe.decision.metrics.contextPct}% of quality ceiling${tail}`;
       return { output: msg, exitCode: 0 };
     }
     if (warnOn.includes('verbose')) {
