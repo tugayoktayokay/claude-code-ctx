@@ -33,13 +33,22 @@ Existing tooling doesn't surface this:
 ## Install
 
 ```bash
+npm install -g claude-ctx
+ctx --help
+```
+
+Or from source:
+
+```bash
 git clone https://github.com/tugayoktayokay/ctx.git ~/tools/ctx
 cd ~/tools/ctx
 npm link
 ctx --help
 ```
 
-Requires Node 18+. No `npm install` step — the package has no dependencies.
+Requires Node 18+. No transitive dependencies — the package has nothing in `dependencies` or `devDependencies`.
+
+> The npm package is named `claude-ctx` (the bare `ctx` name was taken by an unrelated package). The CLI command you run stays `ctx`.
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "name": "ctx",
+  "name": "claude-ctx",
   "version": "0.1.0",
   "description": "Claude Code context manager — standalone zero-dep CLI that tracks session token usage against a model-aware quality ceiling, generates tailored /compact prompts, and bridges sessions to memory.",
   "bin": {
