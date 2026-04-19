@@ -17,12 +17,17 @@
     },
     "growth_window": 5,
     "growth_warn": 5000,
-    "output_ratio_warn": 0.4
+    "output_ratio_warn": 0.4,
+    "max_entries": 20000
   },
   "watch": {
     "interval_ms": 10000,
     "macos_notifications": true,
     "terminal_status": true
+  },
+  "daemon": {
+    "auto_snapshot_on": [],
+    "auto_backup_on": []
   },
   "categories": {
     "schema":   { "words": ["schema","migration","drizzle","prisma","alter table","create table","pgtable","migrate"], "label": "DB/Schema" },
@@ -38,6 +43,45 @@
   },
   "snapshot": {
     "memory_dir": "{project_dir}/memory",
-    "auto_index_update": true
+    "auto_index_update": true,
+    "dedup_window_n": 3
+  },
+  "backup": {
+    "enabled": true,
+    "dir": "~/.config/ctx/backups",
+    "keep_last": 10
+  },
+  "prune": {
+    "default_older_than": "30d",
+    "default_keep_last": 20
+  },
+  "retrieval": {
+    "weights": { "category": 0.5, "keyword": 0.3, "recency": 0.2 },
+    "recency_half_life_days": 90,
+    "min_score": 0.15,
+    "top_n": 3,
+    "max_candidates": 2000,
+    "scan_timeout_ms": 2000
+  },
+  "stopwords": {
+    "tr": ["ve","bir","bu","ne","nasıl","için","ile","mi","mu","ama","fakat","ki","o","şu","da","de","ya","mı","şöyle","böyle"],
+    "en": ["the","and","how","what","to","a","an","is","are","was","were","be","or","of","in","on","at","it","this","that"]
+  },
+  "notes": {
+    "roots": [],
+    "exclude": ["node_modules", ".git", "dist", "build", ".cache", "vendor", "target"],
+    "max_file_kb": 512,
+    "follow_symlinks": false
+  },
+  "hooks": {
+    "session_start": { "restore_latest": true, "max_bytes": 8192 },
+    "stop":          { "snapshot_on": ["urgent", "critical"], "backup_on": ["critical"] },
+    "pre_compact":   { "inject_guidance": true, "respect_user_input": true },
+    "post_tool_use": {
+      "triggers": [
+        { "tool": "Bash", "match": "^git commit", "action": "snapshot" }
+      ]
+    },
+    "user_prompt_submit": { "warn_on": [] }
   }
 }
