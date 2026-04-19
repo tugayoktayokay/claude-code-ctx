@@ -33,7 +33,7 @@ Existing tooling doesn't surface this:
 ## Install
 
 ```bash
-npm install -g noospire-ctx
+npm install -g claude-code-ctx
 ctx --help
 ```
 
@@ -48,7 +48,7 @@ ctx --help
 
 Requires Node 18+. No transitive dependencies — the package has nothing in `dependencies` or `devDependencies`.
 
-> The CLI command is `ctx`. The npm package is `noospire-ctx` because the bare `ctx` and `claude-ctx` names are taken or blocked by npm's typo-squatting policy.
+> The CLI command is `ctx`. The npm package is `claude-code-ctx` because the bare `ctx` and `claude-ctx` names are taken or blocked by npm's typo-squatting policy.
 
 ---
 
