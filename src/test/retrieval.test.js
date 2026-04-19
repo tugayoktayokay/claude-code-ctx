@@ -94,3 +94,27 @@ test('collectProjectCandidates reads frontmatter categories when present', () =>
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+const { collectAllProjectsCandidates } = require('../retrieval.js');
+
+test('collectAllProjectsCandidates aggregates across projects/*/memory', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-glob-'));
+  const root = path.join(base, 'projects');
+  fs.mkdirSync(path.join(root, '-tmp-a', 'memory'), { recursive: true });
+  fs.mkdirSync(path.join(root, '-tmp-b', 'memory'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '-tmp-a', 'memory', 'project_x.md'),
+    '---\nname: x\nfingerprint: aaaa\n---\nstripe webhook'
+  );
+  fs.writeFileSync(
+    path.join(root, '-tmp-b', 'memory', 'project_y.md'),
+    '---\nname: y\nfingerprint: bbbb\n---\nother body'
+  );
+
+  try {
+    const c = collectAllProjectsCandidates(root, loadDefaults());
+    assert.equal(c.length, 2, 'both projects contributed');
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});

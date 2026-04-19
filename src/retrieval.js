@@ -115,9 +115,28 @@ function rank(query, candidates, config) {
   return scored.slice(0, topN);
 }
 
+function collectAllProjectsCandidates(projectsRoot, config) {
+  if (!fs.existsSync(projectsRoot)) return [];
+  let names;
+  try { names = fs.readdirSync(projectsRoot); } catch { return []; }
+  const all = [];
+  for (const name of names) {
+    const memDir = path.join(projectsRoot, name, 'memory');
+    try {
+      if (!fs.statSync(memDir).isDirectory()) continue;
+    } catch { continue; }
+    const part = collectProjectCandidates(memDir, config);
+    for (const c of part) all.push(c);
+  }
+  all.sort((a, b) => b.mtime - a.mtime);
+  const cap = config?.retrieval?.max_candidates ?? 2000;
+  return all.slice(0, cap);
+}
+
 module.exports = {
   readSnapshotHead,
   collectProjectCandidates,
+  collectAllProjectsCandidates,
   scoreSnapshot,
   rank,
 };
