@@ -1,229 +1,148 @@
 # ctx
 
-**An integrated memory + backup agent for Claude Code. You code; ctx handles context hygiene — automatic snapshots, gzipped JSONL backups, tailored `/compact` prompts, auto-restore on new sessions.**
+**Claude Code context manager + personal dev memory engine.** Token monitoring, auto-snapshot before `/clear`, tailored `/compact` prompt, ranked search across past sessions, system-prompt bloat audit, MCP tools that wrap heavy commands and cache their output, PreToolUse guardrails that catch risky Bash before it floods context.
 
-Zero dependencies. Zero AI calls. One command (`ctx setup`) installs the Claude Code hooks and the rest is automatic. Or run it standalone from a side terminal — your call.
+Zero runtime dependencies. No LLM calls. Pure Node 18+.
 
 ---
 
-## Why it exists
+## What it does
 
-Claude Code now ships with Opus 4 at a 1M-token context window. But quality degrades well before you hit the ceiling — typically around 200k, where cache churn and attention dilution start to bite.
+Three layers stacked on Claude Code's hook + MCP systems:
 
-Existing tooling doesn't surface this:
+**Hooks (event-driven).**
+- **SessionStart** auto-injects the most recent snapshot — new sessions don't start from zero after `/clear`.
+- **Stop** at urgent+ level: writes a snapshot, gzips the full JSONL to `~/.config/ctx/backups/`, and copies a tailored `/compact` prompt to your clipboard. You paste with `⌘V`.
+- **PreCompact** adds focus/keep/drop guidance so `/compact` preserves the right stuff.
+- **PreToolUse** on Bash: catches `find /`, `ls -R`, unbounded `grep -r`, `cat /var/log/…` and similar, tells Claude to narrow scope before the command runs.
+- **PostToolUse** on Bash: every `git commit` triggers a snapshot (`trigger: commit` in frontmatter).
+- **UserPromptSubmit** on the first 1–2 prompts of a session: runs ranked search across past snapshots and injects the best match as `additionalContext`. Claude "remembers" how you solved X last time.
 
-| tool | problem it solves | what it misses |
-|---|---|---|
-| [ccusage](https://github.com/ryoppippi/ccusage) | "How much have I spent?" (cost + token reports) | No active in-session guidance |
-| [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) | "How much of my Pro/Max plan is left?" (5h windows) | Tracks plan quota, not context saturation |
-| [claudikins-acm](https://github.com/elb-pr/claudikins-automatic-context-manager) | Auto-handoff at 60% via plugin hooks | Fixed threshold, no model-aware ceiling, plugin eats in-session tokens |
-| [claude-mem](https://github.com/thedotmack/claude-mem) | AI-compressed memory injection via agent-sdk | Uses AI on every capture, SQLite + HTTP worker, heavy |
-| **ctx** | **When should I stop? What should I preserve?** | — |
+**MCP server (Claude-initiated).** ctx exposes 9 tools Claude can call during a conversation:
+- `ctx_ask`, `ctx_timeline`, `ctx_stats`, `ctx_snapshot`, `ctx_heavy` — memory/audit
+- `ctx_shell`, `ctx_read`, `ctx_grep` — wrappers that summarize + cache oversized output
+- `ctx_cache_get` — paginate cached output by ref
 
-`ctx` answers two questions `ccusage` doesn't and makes two choices the plugins don't:
+When Claude would otherwise run `Bash("find / -name X")` and get 500 KB back, it calls `ctx_shell` instead: full output is stored in `~/.config/ctx/mcp-cache/<ref>.txt`, context gets a 2 KB summary + ref. Same idea as context-mode, built without SQLite or native deps.
 
-1. **Model-aware quality ceiling.** Opus 4's 1M is the technical max; 200k is where quality ceiling kicks in. `ctx` thresholds fire against the ceiling, not the max. Haiku gets 100k. Override per-model in config.
-2. **Tailored `/compact` prompts.** `ctx compact` reads your session, detects categories (schema / api / auth / bug / etc.), extracts critical signals (decisions, failed attempts, endpoints, errors), and generates a ready-to-paste prompt like:
-   > `/compact focus on API routes + DB/Schema — keep: files: petitions.ts, schema.prisma; 2 architectural decisions; failed attempts — continue: "now wire the stripe webhook"`
-3. **Standalone.** No plugin, no hooks, no agent-sdk. Runs in a side terminal or as a background daemon. Your Claude Code session doesn't know it exists.
-4. **Zero deps.** Pure Node built-ins. 1600 lines. Readable in one sitting.
+**CLI + 20 slash commands (user-initiated).** `/ctx-ask`, `/ctx-timeline`, `/ctx-doctor`, `/ctx-report`, etc. — all shell out to the same CLI.
 
 ---
 
 ## Install
 
-Two install paths — pick one.
+Two paths.
 
-### Option A: Plugin (recommended, same UX as context-mode)
+### Recommended: Claude Code plugin
 
 ```bash
-# One-time clone
-git clone https://github.com/tugayoktayokay/claude-code-ctx ~/.claude/plugins/claude-code-ctx
+git clone https://github.com/tugayoktayokay/claude-code-ctx ~/tools/claude-code-ctx
 ```
 
 Then inside any Claude Code session:
 
 ```
-/plugin install file:///$HOME/.claude/plugins/claude-code-ctx
+/plugin marketplace add /Users/you/tools/claude-code-ctx
+/plugin install ctx@claude-code-ctx
 ```
 
-Or, once published to a marketplace:
+Or via GitHub (same effect):
 
 ```
 /plugin marketplace add tugayoktayokay/claude-code-ctx
-/plugin install ctx
+/plugin install ctx@claude-code-ctx
 ```
 
-Claude Code reads `.claude-plugin/plugin.json`, auto-registers all 6 hooks + the MCP server. Manage with `/plugin list`, `/plugin disable ctx`, `/plugin update ctx`. No `ctx setup` needed for this path.
+Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 20 slash commands automatically. Manage with `/plugin list`, `/plugin disable ctx`, `/plugin update ctx`.
 
-### Option B: npm + manual setup (scripting / no plugin system)
+### Alternative: npm + manual setup
 
 ```bash
 npm install -g claude-code-ctx
 ctx setup         # writes hooks + MCP entry into ~/.claude/settings.json
-ctx status        # verify everything is wired
+ctx status        # verify
 ```
 
-`ctx setup` is idempotent. It reads your existing `~/.claude/settings.json`, makes a timestamped backup, and merges in ctx hooks tagged `source: "ctx"`. Your own hooks are never touched. Undo with `ctx uninstall-hooks`.
-
-After setup, your Claude Code sessions get:
-
-- **SessionStart** → last snapshot for this project is auto-injected as context. You never start from scratch after `/clear`.
-- **Stop** → at `urgent`/`critical` level, a snapshot is written. At `critical`, the full JSONL is gzipped into `~/.config/ctx/backups/<project>/`.
-- **PreCompact** → when you type `/compact`, ctx injects the tailored focus/keep/drop/continue as hint context so Claude's summarization knows what to preserve. (PreCompact doesn't rewrite the `/compact` command itself — Claude Code doesn't expose that — but the guidance lands in the same turn.)
-- **PostToolUse** → every `git commit` triggers a snapshot with `trigger: commit` in the frontmatter.
-
-Or from source:
-
-```bash
-git clone https://github.com/tugayoktayokay/claude-code-ctx.git ~/tools/claude-code-ctx
-cd ~/tools/claude-code-ctx
-npm link
-ctx setup
-```
-
-Requires Node 18+. Nothing in `dependencies` or `devDependencies`.
-
-> The CLI command is `ctx`. The npm package is `claude-code-ctx` because the bare `ctx` and `claude-ctx` names are taken or blocked by npm's typo-squatting policy.
+Both paths coexist without conflict. Plugin path auto-updates; npm path needs `ctx upgrade`. If you installed both, `ctx status` warns and `ctx uninstall-hooks` clears the manual copy.
 
 ---
 
-## Commands
+## Slash commands (inside Claude Code)
 
-Integration:
+| command | does |
+|---|---|
+| `/ctx-doctor` | health check (hooks, config, daemon, plugin install) |
+| `/ctx-status` | install state + latest snapshot + latest backup |
+| `/ctx-analyze` | current session: token %, metrics, recommendation |
+| `/ctx-ask <query>` | ranked snapshot search (BM25 + category + recency) |
+| `/ctx-timeline` | threaded parent-chain history |
+| `/ctx-stats` | weekly snapshot/trigger/category aggregate |
+| `/ctx-heavy` | largest tool outputs in this session + tool-specific hints |
+| `/ctx-bloat` | CLAUDE.md + SKILL.md footprint, flag unused skills |
+| `/ctx-usage [--tools\|--skills]` | aggregate usage across recent sessions |
+| `/ctx-compact` | build tailored /compact prompt, copy to clipboard |
+| `/ctx-snapshot [name]` | manual checkpoint |
+| `/ctx-report [path]` | self-contained HTML report |
+| `/ctx-restore [id]` | list / restore gzipped JSONL backups |
+| `/ctx-prune [--apply]` | memory dir cleanup |
+| `/ctx-purge [--apply]` | delete this project's memory + backups |
+| `/ctx-upgrade` | git pull latest source |
+| `/ctx-history [N]` | last N sessions across all projects |
+| `/ctx-config` | show config paths |
+| `/ctx-diff <a.md> <b.md>` | snapshot delta |
+| `/ctx-file <path>` | analyze a specific JSONL |
+
+---
+
+## CLI (terminal)
 
 ```bash
-ctx setup                            # install hooks + ensure config (run once)
-ctx install-hooks                    # just the hook merge, idempotent
-ctx uninstall-hooks                  # remove ctx hooks, preserve foreign ones
-ctx status                           # health: hooks, daemon, last snapshot, backups
-ctx hook <event>                     # internal stdin/stdout handler (Claude Code calls this)
-```
-
-Analysis + memory:
-
-```bash
-ctx                                  # analyze current session, show recommendation
-ctx watch                            # live token % in foreground terminal
-ctx daemon start|stop|status|log     # background watcher with macOS notifications
-ctx compact                          # generate tailored /compact prompt, copy to clipboard
-ctx snapshot [--name NAME]           # write session summary to your Claude Code memory dir
+ctx                          # analyze current session
+ctx watch                    # live foreground monitor
+ctx daemon start|stop|status # background watcher + macOS notifications
 ctx ask "<query>" [--global] [--notes] [--inject] [--json]
-                                     # search past snapshots, ranked by category + keyword + recency
-ctx timeline                         # snapshot threads (follow parent chain)
-ctx diff <snap-a> <snap-b>           # files/decisions/failed-attempts delta
-ctx stats [--week|--month|--days N]  # local analytics
-ctx prune [--apply] [--older-than 30d] [--keep-last 20] [--per-project]
-                                     # dry-run memory cleanup; rerun with --apply to delete
-ctx restore --list                   # show gzipped JSONL backups for this project
-ctx restore <session-id> [--to P]    # gunzip a backup to stdout or a file
-ctx history [N]                      # last N sessions across all projects
-ctx config                           # open / create ~/.config/ctx/config.json
-ctx file <path>                      # analyze a specific JSONL file
+ctx compact                  # tailored /compact prompt → clipboard
+ctx snapshot [--name N]      # manual snapshot
+ctx timeline                 # threaded history
+ctx diff <a> <b>             # snapshot delta
+ctx stats [--week|--month]   # aggregation
+ctx heavy                    # largest outputs in current session
+ctx bloat                    # system-prompt footprint audit
+ctx usage --tools --days 30  # tool usage across sessions
+ctx report --out file.html   # self-contained HTML report
+ctx restore --list           # list JSONL backups
+ctx prune [--apply]          # memory dir cleanup
+ctx doctor                   # 9 health checks
+ctx status                   # install + config state
 ```
-
-### `ctx` — analyze
-
-Reads the most recent JSONL under `~/.claude/projects/<encoded-cwd>/` and prints:
-
-```
-  [█████████████████████░░░░░░░░░░░░░░░░░░░] 54%
-  108.1k / 200.0k quality ceiling   (model max 1.0M)
-  ⚠️  COMPACT
-  model: claude-opus-4-7
-
-  Metrics:
-    Messages  : 75
-    Tool calls: 71
-    Files     : 20
-    Output    : 183.7k tokens
-
-  Analysis:
-    • Context 54% of 200.0k quality ceiling (108.1k tokens)
-    • Model max: 1.0M, but quality degrades past 200.0k
-
-  ✓ Keep in compact:
-    • active areas: Tests, Infra/DevOps, Bug fix, AI integration
-    • modified files (20): …
-    • last task: "now wire the stripe webhook"
-
-  ➜ ctx compact — prepare a tailored /compact prompt
-```
-
-### `ctx compact` — tailored prompt
-
-The payoff command. `ccusage` tells you 150k tokens are gone; `ctx compact` tells you *what* those tokens were and writes the prompt that preserves the important parts:
-
-```
-  /compact prompt (copy + paste):
-
-  /compact focus on API routes + DB/Schema + Bug fix — keep: files: petitions.ts, schema.prisma, petitions.test.ts, auth.ts; 2 architectural decisions; failed attempts; decision, endpoint, failed attempt — continue: "now wire the stripe webhook"
-
-  ✓ Copied to clipboard
-```
-
-Paste it straight into Claude Code. The structure tells Claude what to focus on, what to preserve, what to drop, and what you were about to do next.
-
-### `ctx daemon` — background
-
-```bash
-ctx daemon start    # detaches, writes pid to ~/.config/ctx/daemon.pid
-ctx daemon status   # uptime, last level, last git commit
-ctx daemon log 30   # tail
-ctx daemon stop
-```
-
-The daemon polls every 10 seconds (configurable). It fires a macOS notification when:
-- You cross a threshold (`compact` / `urgent` / `critical`)
-- You make a new git commit in the cwd — natural moment for `ctx snapshot`
-
-No time-based alerts ("you've been coding for 45 minutes"). Token state or git state only.
-
-### `ctx snapshot` — bridge to memory
-
-Writes a markdown file into `~/.claude/projects/<cwd>/memory/project_<auto-name>.md` with:
-- What files you modified
-- Architectural decisions detected
-- Failed approaches to avoid
-- Last user intent
-- Context metrics at snapshot time
-
-Then appends a line to `MEMORY.md`. The next session's Claude Code instance loads it as context. If you use a custom `/snapshot` skill, this is the non-interactive version of it.
 
 ---
 
 ## Memory engine
 
-Past snapshots are no longer a write-only archive. ctx ranks them by keyword + category + recency, and Claude Code's **UserPromptSubmit** hook auto-retrieves the most relevant one for your first 1-2 prompts of a new session — so you pick up where you left off instead of starting from zero.
+Past snapshots are not a write-only archive. ctx ranks them with a BM25 hybrid (IDF + category overlap + recency decay, Porter-lite stemming, Levenshtein fuzzy fallback) and Claude's UserPromptSubmit hook auto-retrieves the best match for your first 1–2 prompts of a new session — so you pick up where you left off instead of re-explaining context.
 
-**Explicit recall:**
-
-```bash
+**Explicit recall** via `ctx ask` / `/ctx-ask`:
+```
 ctx ask "stripe webhook"
-# → top 3 snapshots with score breakdown (category/keyword/recency)
-
-ctx ask "stripe webhook" --inject
-# → copies top match to clipboard, paste into Claude
-
+  # → top 3 snapshots with score breakdown (category/keyword/recency)
 ctx ask "auth flow" --global
-# → searches across all projects
-
+  # → across all projects
 ctx ask "design doc" --notes
-# → also scans user markdown roots (~/notes, Obsidian vault, …)
-#   configure via ~/.config/ctx/config.json → notes.roots
+  # → also scans config-declared markdown roots (Obsidian, ~/notes, …)
 ```
 
-**Auto-inject:** on the first 1-2 prompts of a session, if a past snapshot scores ≥ `min_score` (default 0.3), ctx injects it as `additionalContext`. Every injection is logged to `~/.config/ctx/hooks.log` — fully transparent. Disable via `hooks.user_prompt_submit.auto_retrieve.enabled: false`.
+**Auto-inject** via hook: on the first 1–2 prompts of a session, if a past snapshot scores ≥ `min_score` (default 0.3), ctx injects it as `additionalContext`. Every injection is logged to `~/.config/ctx/hooks.log` — fully transparent.
 
 **Timeline + diff:** `ctx timeline` threads snapshots by `parent:` pointer so you see a project's evolution. `ctx diff <a> <b>` shows what files/decisions/failed attempts changed between two snapshots.
 
-**Stats:** `ctx stats --week` shows the last N days of snapshot counts, trigger sources (commit/urgent/manual), and top categories.
+**Bloat audit:** `ctx bloat` scans `~/.claude/CLAUDE.md`, your project `CLAUDE.md`, and every installed `SKILL.md` (across all plugins) — reports per-file description byte cost, flags skills not invoked in the last N days. Reducing unused skills is the cheapest token win.
 
 ---
 
 ## Configuration
 
-`~/.config/ctx/config.json` — created on first `ctx config` call.
+`~/.config/ctx/config.json` (deep-merged over `config.default.json`). Key sections:
 
 ```json
 {
@@ -231,40 +150,38 @@ ctx ask "design doc" --notes
     "models": {
       "claude-opus-4-7":   { "max": 1000000, "quality_ceiling": 200000 },
       "claude-sonnet-4-6": { "max": 200000,  "quality_ceiling": 200000 },
-      "claude-haiku-4-5":  { "max": 200000,  "quality_ceiling": 100000 },
-      "default":           { "max": 200000,  "quality_ceiling": 200000 }
+      "claude-haiku-4-5":  { "max": 200000,  "quality_ceiling": 100000 }
     },
-    "thresholds": {
-      "comfortable": 0.20,
-      "watch":       0.40,
-      "compact":     0.55,
-      "urgent":      0.75,
-      "critical":    0.90
+    "thresholds": { "compact": 0.55, "urgent": 0.75, "critical": 0.90 }
+  },
+  "hooks": {
+    "session_start": { "restore_latest": true, "max_bytes": 8192 },
+    "stop":          { "snapshot_on": ["urgent","critical"], "backup_on": ["critical"], "clipboard_compact_on": ["compact","urgent","critical"] },
+    "pre_compact":   { "inject_guidance": true, "respect_user_input": true },
+    "pre_tool_use":  { "enabled": true, "default_mode": "ask", "rules": [ ... 9 default patterns ... ] },
+    "post_tool_use": { "triggers": [{"tool":"Bash","match":"^git commit","action":"snapshot"}] },
+    "user_prompt_submit": {
+      "warn_on": [],
+      "heavy_threshold_bytes": 10000,
+      "auto_retrieve": { "enabled": true, "max_turns": 2, "min_score": 0.3, "scopes": ["project","global"] }
     }
   },
-  "categories": {
-    "api":    { "words": ["route", "endpoint", "fastify", "express"], "label": "API routes" },
-    "schema": { "words": ["schema", "migration", "prisma"],          "label": "DB/Schema" }
-  },
-  "watch": {
-    "interval_ms": 10000,
-    "macos_notifications": true
-  }
+  "backup": { "keep_last": 10, "dir": "~/.config/ctx/backups" },
+  "retrieval": { "weights": { "category": 0.5, "keyword": 0.3, "recency": 0.2 }, "min_score": 0.15, "top_n": 3 },
+  "notes":  { "roots": [], "exclude": ["node_modules",".git","dist","build"] }
 }
 ```
-
-The model list is matched against Claude Code's `message.model` field in the JSONL. Unknown models fall back to `default`. The category word lists drive both detection and the `/compact` prompt structure.
 
 ---
 
 ## What ctx deliberately does *not* do
 
-- **Write to `CLAUDE.md`.** Your architecture docs are yours; `ctx` never touches them. Snapshots go only into `~/.claude/projects/<cwd>/memory/`.
-- **Auto-type `/clear`.** Slash commands are user actions; ctx doesn't pretend to be you. It *does* snapshot and back up the JSONL before you type `/clear`, so nothing is lost.
-- **Call an LLM.** Everything is regex, token math, and category heuristics. No `anthropic` SDK, no agent-sdk, no API key needed.
-- **Overwrite your own Claude Code hooks.** Install is tag-based (`source: "ctx"`). Uninstall removes only ctx-tagged entries. Foreign hooks, matchers, and command strings are preserved.
-- **Fire time-based alerts.** A 45-minute session that's at 30k tokens is fine. A 5-minute session that's at 180k is not.
-- **Require an npm install at runtime.** No dependencies, ever. You can drop the repo on a box with Node 18+ and `npm link`.
+- **Write to `CLAUDE.md`.** Your architecture docs are yours; ctx never touches them. Snapshots go only into `~/.claude/projects/<cwd>/memory/`.
+- **Auto-type `/clear` or `/compact`.** Slash commands are user actions; Claude Code exposes no API for us to simulate them. ctx makes them frictionless (`/compact` prompt already in clipboard, `/clear` safe because SessionStart restores) but you still press the keys.
+- **Call an LLM.** All inference is regex, BM25 math, Porter-lite stemming, Levenshtein distance. No `@anthropic-ai/*`, no embeddings service, no API key needed.
+- **Overwrite your own hooks or MCP servers.** Install is tag-based (`source: "ctx"`). Uninstall removes only ctx-tagged entries. Foreign entries are preserved.
+- **Fire time-based alerts.** Triggers are state-driven (threshold crossings, git commits, Stop events) — never "N minutes elapsed".
+- **Require native deps.** No `better-sqlite3`, no Python, no Bun. Clone the repo and it runs on any Node 18+.
 
 ---
 
@@ -274,35 +191,25 @@ The model list is matched against Claude Code's `message.model` field in the JSO
 node --test src/test/*.test.js
 ```
 
-17 tests covering session parsing, analysis, decision thresholds, compact strategy, snapshot writing, model detection, and git integration. The fixture `src/test/fixtures/demo-session.jsonl` is the canonical reference for what a JSONL entry looks like.
+123 tests across 17 files: session parsing, analyzer, decision thresholds, compact strategy, snapshot writing + fingerprint dedup, pipeline extraction, hooks (all 7 events), hooks install/uninstall, backup round-trip + rotation, prune + MEMORY.md rewrite, retrieval (BM25 + stemming + fuzzy), notes walker, timeline chain traversal, diff, stats, optimize (bloat + usage + heavy), report HTML generation, MCP protocol (initialize + tools/list + tools/call + cancellation + validation + empty-list methods + progress + CRLF), MCP cache round-trip, MCP tool handlers.
 
 ---
 
 ## Architecture
 
-```
-src/
-  session.js         JSONL reader, cwd encoding, findLatestSession
-  analyzer.js        entries → stats (tokens + categories + files + decisions + critical patterns)
-  decision.js        stats → level + action (model-aware thresholds)
-  strategy.js        analysis → /compact prompt builder + clipboard
-  pipeline.js        runAnalyze({cwd|sessionPath|entries, config}) — shared entry point
-  snapshot.js        analysis → memory markdown + fingerprint dedup + MEMORY.md index/rewrite
-  backup.js          stream JSONL → gzip + rotate + restore
-  prune.js           planPrune/applyPrune memory dir, hand-written MEMORY.md lines preserved
-  hooks.js           Claude Code hook handlers (stdin JSON → stdout JSON/empty, never blocks)
-  hooks_install.js   merge/unmerge settings.json entries tagged source:"ctx"
-  watcher.js         foreground live loop
-  daemon.js          background loop + pid/log/state + optional auto-snapshot/backup
-  models.js          detectModel() + getLimits()
-  config.js          defaults merge + user config loader
-  output.js          ANSI formatting + macOS notifier
-  cli.js             subcommand dispatch
-bin/
-  ctx                shebang entrypoint (async-aware)
-```
+See `CLAUDE.md` for module boundaries. Summary: one-way data flow through pure-ish modules, `cli.js` dispatches, `pipeline.runAnalyze` is the shared entry point from cwd to analysis+decision+strategy.
 
-Each module is independently testable. `src/test/*.test.js` mirrors this layout. 53 tests total.
+Key modules:
+- `session.js` — JSONL + cwd encoding
+- `analyzer.js` — entries → stats (tokens, files, categories, decisions, failed attempts, large outputs)
+- `decision.js` — stats + limits → level/action
+- `strategy.js` — tailored `/compact` prompt
+- `snapshot.js` — markdown + frontmatter (parent, categories, fingerprint, trigger)
+- `query.js` + `retrieval.js` + `notes.js` — BM25 ranked search over snapshots + user notes
+- `timeline.js`, `diff.js`, `stats.js`, `optimize.js` — memory engine analytics
+- `hooks.js` + `hooks_install.js` — hook handlers + settings.json merge
+- `mcp.js` + `mcp_tools.js` + `mcp_cache.js` — JSON-RPC server, 9 tools, TTL cache
+- `doctor.js`, `report.js`, `backup.js`, `prune.js` — operator commands
 
 ---
 
