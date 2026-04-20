@@ -46,6 +46,8 @@ Three layers stacked on Claude Code's hook + MCP systems:
 
 When Claude would otherwise run `Bash("find / -name X")` and get 500 KB back, it calls `ctx_shell` instead: full output is stored in `~/.config/ctx/mcp-cache/<ref>.txt`, context gets a 2 KB summary + ref. Same idea as context-mode, built without SQLite or native deps.
 
+**BM25 search cache.** Tokenized snapshot bodies are cached at `~/.config/ctx/bm25/<encoded-cwd>.json.gz` (gzip format). Speeds up `/ctx-ask` after the first query per project. Safe to delete; rebuilds on next query.
+
 **CLI + 20 slash commands (user-initiated).** `/ctx-ask`, `/ctx-timeline`, `/ctx-doctor`, `/ctx-report`, etc. — all shell out to the same CLI.
 
 ---

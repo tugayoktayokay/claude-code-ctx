@@ -19,6 +19,7 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
   const results = [];
 
   results.push(checkNodeVersion());
+  results.push(checkBm25Cache());
   results.push(...checkConfig());
   results.push(...checkHooksInstalled(cwdBinary));
   results.push(...checkDaemon());
@@ -33,6 +34,21 @@ function checkNodeVersion() {
   const major = parseInt(ver.replace(/^v/, '').split('.')[0], 10);
   if (major >= 18) return { ...CHECKS.ok, label: 'Node version', detail: ver };
   return { ...CHECKS.fail, label: 'Node version', detail: `${ver} — need 18+` };
+}
+
+function checkBm25Cache() {
+  const dir = path.join(os.homedir(), '.config', 'ctx', 'bm25');
+  if (!fs.existsSync(dir)) {
+    return { ...CHECKS.info, label: 'BM25 cache', detail: 'not built yet' };
+  }
+  try {
+    const names = fs.readdirSync(dir).filter(n => n.endsWith('.json.gz'));
+    let total = 0;
+    for (const n of names) total += fs.statSync(path.join(dir, n)).size;
+    return { ...CHECKS.ok, label: 'BM25 cache', detail: `${names.length} project(s), ${Math.round(total / 1024)} KB` };
+  } catch (err) {
+    return { ...CHECKS.warn, label: 'BM25 cache', detail: `unreadable: ${err.message}` };
+  }
 }
 
 function checkConfig() {
