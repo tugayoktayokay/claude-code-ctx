@@ -1,8 +1,19 @@
-# ctx
+# claude-code-ctx
 
-**Claude Code context manager + personal dev memory engine.** Token monitoring, auto-snapshot before `/clear`, tailored `/compact` prompt, ranked search across past sessions, system-prompt bloat audit, MCP tools that wrap heavy commands and cache their output, PreToolUse guardrails that catch risky Bash before it floods context.
+[![npm version](https://img.shields.io/npm/v/claude-code-ctx.svg)](https://www.npmjs.com/package/claude-code-ctx)
+[![license](https://img.shields.io/npm/l/claude-code-ctx.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/claude-code-ctx.svg)](https://nodejs.org)
+[![tests](https://img.shields.io/badge/tests-123%20passing-brightgreen.svg)](src/test)
+[![deps](https://img.shields.io/badge/deps-0-brightgreen.svg)](package.json)
 
-Zero runtime dependencies. No LLM calls. Pure Node 18+.
+> **Claude Code context manager + personal dev memory engine.**
+> Token monitoring, auto-snapshot before `/clear`, tailored `/compact` prompt, ranked search across past sessions, system-prompt bloat audit, MCP tools that wrap heavy commands and cache their output, PreToolUse guardrails that catch risky Bash before it floods context.
+>
+> **Zero runtime dependencies. No LLM calls. Pure Node 18+.**
+
+> 📦 **Package name:** `claude-code-ctx` (npm) / `claude-code-ctx@claude-code-ctx` (Claude Code plugin)
+> 💻 **CLI binary:** `ctx` (short, what you type in terminal)
+> 🪝 **Slash commands:** `/ctx-doctor`, `/ctx-ask`, … (20 commands, see below)
 
 ---
 
@@ -43,14 +54,14 @@ Then inside any Claude Code session:
 
 ```
 /plugin marketplace add /Users/you/tools/claude-code-ctx
-/plugin install ctx@claude-code-ctx
+/plugin install claude-code-ctx@claude-code-ctx
 ```
 
 Or via GitHub (same effect):
 
 ```
 /plugin marketplace add tugayoktayokay/claude-code-ctx
-/plugin install ctx@claude-code-ctx
+/plugin install claude-code-ctx@claude-code-ctx
 ```
 
 Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 20 slash commands automatically. Manage with `/plugin list`, `/plugin disable ctx`, `/plugin update ctx`.
@@ -64,6 +75,17 @@ ctx status        # verify
 ```
 
 Both paths coexist without conflict. Plugin path auto-updates; npm path needs `ctx upgrade`. If you installed both, `ctx status` warns and `ctx uninstall-hooks` clears the manual copy.
+
+### Migrating from 0.3.0
+
+Version 0.4.0 renames the plugin identifier from `ctx` to `claude-code-ctx` so it matches the npm package + marketplace. If you installed 0.3.0:
+
+```
+/plugin uninstall ctx@claude-code-ctx
+/plugin install claude-code-ctx@claude-code-ctx
+```
+
+Slash commands (`/ctx-ask`, `/ctx-doctor`, …) and the CLI binary (`ctx`) are unchanged.
 
 ---
 

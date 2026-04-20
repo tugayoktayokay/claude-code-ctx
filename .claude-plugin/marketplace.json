@@ -7,7 +7,7 @@
   },
   "plugins": [
     {
-      "name": "ctx",
+      "name": "claude-code-ctx",
       "description": "Context manager: token monitoring, auto-snapshot + JSONL backup, tailored /compact prompt, BM25 snapshot search, 9 MCP tools (ctx_ask, ctx_shell, ctx_read, ctx_grep, ctx_cache_get + memory), PreToolUse guardrails, bloat audit. Zero runtime deps, no LLM calls.",
       "source": {
         "source": "url",

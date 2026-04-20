@@ -393,7 +393,7 @@ function runStatus(_args, config) {
       const reg = JSON.parse(fs.readFileSync(regPath, 'utf8'));
       const plugins = reg?.plugins || {};
       for (const key of Object.keys(plugins)) {
-        if (key.startsWith('ctx@') || key === 'ctx') {
+        if (key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx' || key.startsWith('ctx@') || key === 'ctx') {
           const entries = plugins[key];
           const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
           pluginInstalled = { key, version: latest?.version, path: latest?.installPath };
@@ -419,7 +419,7 @@ function runStatus(_args, config) {
   } else if (manualHooksCount) {
     console.log(`    ${C.green}✓ manual${C.reset}  ctx setup hooks (${manualHooksCount} events)`);
   } else {
-    console.log(`    ${C.yellow}⚠ not installed${C.reset}  — 'ctx setup' OR '/plugin install ctx@claude-code-ctx'`);
+    console.log(`    ${C.yellow}⚠ not installed${C.reset}  — 'ctx setup' OR '/plugin install claude-code-ctx@claude-code-ctx'`);
   }
   console.log('');
 

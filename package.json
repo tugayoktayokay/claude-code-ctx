@@ -1,6 +1,6 @@
 {
   "name": "claude-code-ctx",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Claude Code context manager + memory engine. Primary install is as a Claude Code plugin (see README). Also usable standalone as a zero-dep CLI: token monitoring against a model-aware quality ceiling, tailored /compact prompt + auto-clipboard, JSONL gzip backup on /clear, BM25 snapshot search, 9 MCP tools (ctx_ask, ctx_shell, ctx_read, ctx_grep, ctx_cache_get + memory), PreToolUse guardrails, system-prompt bloat audit.",
   "bin": {
     "ctx": "bin/ctx"

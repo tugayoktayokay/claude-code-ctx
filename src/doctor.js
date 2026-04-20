@@ -69,7 +69,7 @@ function checkPluginRegistration() {
     const reg = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
     const plugins = reg?.plugins || {};
     for (const key of Object.keys(plugins)) {
-      if (key.startsWith('ctx@') || key === 'ctx') {
+      if (key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx' || key.startsWith('ctx@') || key === 'ctx') {
         const entries = plugins[key];
         const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
         return { ...CHECKS.ok, label: 'Plugin install', detail: `${key} v${latest?.version || '?'} (${latest?.installPath || 'unknown'})` };
