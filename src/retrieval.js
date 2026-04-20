@@ -2,6 +2,8 @@
 
 const fs   = require('fs');
 const path = require('path');
+const zlib = require('zlib');
+const os   = require('os');
 const { categorize } = require('./query.js');
 
 function readSnapshotHead(filePath) {
@@ -43,6 +45,7 @@ function collectProjectCandidates(memoryDir, config) {
   }
   files.sort((a, b) => b.mtime - a.mtime);
   const top = files.slice(0, maxCandidates);
+  const encoded = path.basename(path.dirname(memoryDir)) || null;
 
   const out = [];
   for (const f of top) {
@@ -56,6 +59,7 @@ function collectProjectCandidates(memoryDir, config) {
     out.push({
       name: f.name,
       path: f.path,
+      project: encoded,
       mtime: f.mtime,
       size: f.size,
       categories,
@@ -208,7 +212,36 @@ function scoreSnapshot(query, snap, config, corpus) {
 function rank(query, candidates, config) {
   const minScore = config?.retrieval?.min_score ?? 0.15;
   const topN     = config?.retrieval?.top_n     ?? 3;
-  const corpus   = candidates.length ? buildCorpusStats(candidates) : null;
+
+  const byProject = new Map();
+  const unkeyed   = [];
+  for (const c of candidates) {
+    if (c.project) {
+      if (!byProject.has(c.project)) byProject.set(c.project, []);
+      byProject.get(c.project).push(c);
+    } else {
+      unkeyed.push(c);
+    }
+  }
+
+  for (const [project, list] of byProject) {
+    const cp = cachePathForProject(project);
+    const cache = loadCache(cp);
+    const mutated = syncCache(cache, list);
+    if (mutated) saveCache(cp, cache);
+    for (const c of list) {
+      const entry = cache.get(c.path);
+      if (entry) {
+        c._terms = entry.terms;
+        c.length = entry.length || c.length;
+      }
+    }
+  }
+  for (const c of unkeyed) {
+    if (!c._terms) c._terms = tokenizeBody(c.body);
+  }
+
+  const corpus = candidates.length ? buildCorpusStats(candidates) : null;
   const scored = [];
   for (const c of candidates) {
     const s = scoreSnapshot(query, c, config, corpus);
@@ -237,6 +270,59 @@ function collectAllProjectsCandidates(projectsRoot, config) {
   return all.slice(0, cap);
 }
 
+const CACHE_VERSION = 1;
+
+function cachePathForProject(encodedCwd) {
+  return path.join(os.homedir(), '.config', 'ctx', 'bm25', `${encodedCwd}.json.gz`);
+}
+
+function loadCache(cachePath) {
+  try {
+    const buf = fs.readFileSync(cachePath);
+    const json = zlib.gunzipSync(buf).toString('utf8');
+    const parsed = JSON.parse(json);
+    if (!parsed || parsed.v !== CACHE_VERSION || !parsed.snapshots) return new Map();
+    return new Map(Object.entries(parsed.snapshots));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveCache(cachePath, cache) {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    const obj = { v: CACHE_VERSION, snapshots: Object.fromEntries(cache) };
+    const gz = zlib.gzipSync(JSON.stringify(obj));
+    const tmp = `${cachePath}.tmp-${process.pid}`;
+    fs.writeFileSync(tmp, gz);
+    fs.renameSync(tmp, cachePath);
+  } catch {
+    // best-effort; swallow
+  }
+}
+
+function syncCache(cache, candidates) {
+  let mutated = false;
+  const alive = new Set();
+  for (const c of candidates) {
+    alive.add(c.path);
+    const mtimeInt = Math.floor(c.mtime);
+    const prev = cache.get(c.path);
+    if (!prev || prev.mtime < mtimeInt) {
+      const terms = tokenizeBody(c.body);
+      cache.set(c.path, { mtime: mtimeInt, terms, length: terms.length });
+      mutated = true;
+    }
+  }
+  for (const k of [...cache.keys()]) {
+    if (!alive.has(k)) {
+      cache.delete(k);
+      mutated = true;
+    }
+  }
+  return mutated;
+}
+
 module.exports = {
   readSnapshotHead,
   collectProjectCandidates,
@@ -249,4 +335,8 @@ module.exports = {
   levenshtein,
   fuzzyMatch,
   rank,
+  loadCache,
+  saveCache,
+  syncCache,
+  cachePathForProject,
 };
