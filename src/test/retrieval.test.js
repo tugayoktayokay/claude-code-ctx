@@ -126,6 +126,7 @@ test('collectProjectCandidates reads frontmatter categories when present', () =>
 });
 
 const { collectAllProjectsCandidates } = require('../retrieval.js');
+const { loadCache, saveCache, syncCache, tokenizeBody } = require('../retrieval.js');
 
 test('collectAllProjectsCandidates aggregates across projects/*/memory', () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-glob-'));
@@ -147,4 +148,71 @@ test('collectAllProjectsCandidates aggregates across projects/*/memory', () => {
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }
+});
+
+test('loadCache + saveCache roundtrip via gzip file', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-cache-'));
+  const cachePath = path.join(base, 'bm25', 'x.json.gz');
+  try {
+    const input = new Map([
+      ['/a.md', { mtime: 1000, terms: ['stripe', 'webhook'], length: 25 }],
+      ['/b.md', { mtime: 2000, terms: ['jwt'], length: 10 }],
+    ]);
+    saveCache(cachePath, input);
+    assert.ok(fs.existsSync(cachePath), 'cache file written');
+    const out = loadCache(cachePath);
+    assert.equal(out.size, 2);
+    assert.deepEqual(out.get('/a.md'), { mtime: 1000, terms: ['stripe', 'webhook'], length: 25 });
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('loadCache returns empty Map on missing file, corrupt gzip, bad JSON, or version mismatch', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-cache-'));
+  try {
+    assert.equal(loadCache(path.join(base, 'missing.json.gz')).size, 0, 'missing → empty');
+
+    const corrupt = path.join(base, 'corrupt.json.gz');
+    fs.writeFileSync(corrupt, Buffer.from([0x00, 0x01, 0x02]));
+    assert.equal(loadCache(corrupt).size, 0, 'bad gzip → empty');
+
+    const badJson = path.join(base, 'bad.json.gz');
+    const zlib = require('zlib');
+    fs.writeFileSync(badJson, zlib.gzipSync('not json'));
+    assert.equal(loadCache(badJson).size, 0, 'bad json → empty');
+
+    const wrongVersion = path.join(base, 'v2.json.gz');
+    fs.writeFileSync(wrongVersion, zlib.gzipSync(JSON.stringify({ v: 2, snapshots: {} })));
+    assert.equal(loadCache(wrongVersion).size, 0, 'wrong version → empty');
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('syncCache tokenizes only new/changed snapshots and drops missing ones', () => {
+  const cache = new Map();
+  const candidates = [
+    { path: '/a.md', mtime: 1000, body: 'stripe webhook idempotency' },
+    { path: '/b.md', mtime: 1000, body: 'jwt auth' },
+  ];
+  const mutated1 = syncCache(cache, candidates);
+  assert.ok(mutated1, 'first sync mutates');
+  assert.equal(cache.size, 2);
+  assert.ok(cache.get('/a.md').terms.includes('stripe'));
+
+  const mutated2 = syncCache(cache, candidates);
+  assert.equal(mutated2, false, 'unchanged sync does not mutate');
+
+  const candidates2 = [
+    { path: '/a.md', mtime: 2000, body: 'new content here' },
+    { path: '/c.md', mtime: 3000, body: 'brand new snapshot' },
+  ];
+  const mutated3 = syncCache(cache, candidates2);
+  assert.ok(mutated3, 'changed sync mutates');
+  assert.equal(cache.size, 2);
+  assert.ok(!cache.has('/b.md'), '/b.md dropped');
+  assert.equal(cache.get('/a.md').mtime, 2000);
+  assert.ok(cache.get('/a.md').terms.includes('content'));
+  assert.ok(cache.has('/c.md'));
 });

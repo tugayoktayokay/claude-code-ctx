@@ -2,6 +2,8 @@
 
 const fs   = require('fs');
 const path = require('path');
+const zlib = require('zlib');
+const os   = require('os');
 const { categorize } = require('./query.js');
 
 function readSnapshotHead(filePath) {
@@ -237,6 +239,59 @@ function collectAllProjectsCandidates(projectsRoot, config) {
   return all.slice(0, cap);
 }
 
+const CACHE_VERSION = 1;
+
+function cachePathForProject(encodedCwd) {
+  return path.join(os.homedir(), '.config', 'ctx', 'bm25', `${encodedCwd}.json.gz`);
+}
+
+function loadCache(cachePath) {
+  try {
+    const buf = fs.readFileSync(cachePath);
+    const json = zlib.gunzipSync(buf).toString('utf8');
+    const parsed = JSON.parse(json);
+    if (!parsed || parsed.v !== CACHE_VERSION || !parsed.snapshots) return new Map();
+    return new Map(Object.entries(parsed.snapshots));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveCache(cachePath, cache) {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    const obj = { v: CACHE_VERSION, snapshots: Object.fromEntries(cache) };
+    const gz = zlib.gzipSync(JSON.stringify(obj));
+    const tmp = `${cachePath}.tmp-${process.pid}`;
+    fs.writeFileSync(tmp, gz);
+    fs.renameSync(tmp, cachePath);
+  } catch {
+    // best-effort; swallow
+  }
+}
+
+function syncCache(cache, candidates) {
+  let mutated = false;
+  const alive = new Set();
+  for (const c of candidates) {
+    alive.add(c.path);
+    const mtimeInt = Math.floor(c.mtime);
+    const prev = cache.get(c.path);
+    if (!prev || prev.mtime < mtimeInt) {
+      const terms = tokenizeBody(c.body);
+      cache.set(c.path, { mtime: mtimeInt, terms, length: terms.length });
+      mutated = true;
+    }
+  }
+  for (const k of [...cache.keys()]) {
+    if (!alive.has(k)) {
+      cache.delete(k);
+      mutated = true;
+    }
+  }
+  return mutated;
+}
+
 module.exports = {
   readSnapshotHead,
   collectProjectCandidates,
@@ -249,4 +304,8 @@ module.exports = {
   levenshtein,
   fuzzyMatch,
   rank,
+  loadCache,
+  saveCache,
+  syncCache,
+  cachePathForProject,
 };
