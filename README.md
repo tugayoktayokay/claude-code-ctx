@@ -1,10 +1,20 @@
 # claude-code-ctx
 
 [![npm version](https://img.shields.io/npm/v/claude-code-ctx.svg)](https://www.npmjs.com/package/claude-code-ctx)
+[![plugin](https://img.shields.io/badge/Claude%20Code-plugin-blueviolet)](#install)
 [![license](https://img.shields.io/npm/l/claude-code-ctx.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/claude-code-ctx.svg)](https://nodejs.org)
 [![tests](https://img.shields.io/badge/tests-123%20passing-brightgreen.svg)](src/test)
 [![deps](https://img.shields.io/badge/deps-0-brightgreen.svg)](package.json)
+
+> ## ⚠️ Prefer the Claude Code plugin install — npm is a fallback
+>
+> Starting with **v0.4.0**, the primary distribution is the Claude Code plugin. The npm package (`claude-code-ctx`) still works but is the secondary path: no auto-updates, no auto-registered slash commands, you must run `ctx setup` manually.
+>
+> **If you're installing today → use the plugin**, see [Install](#install) below.
+> **If you already installed via npm → still works**, but consider migrating (`ctx uninstall-hooks` then `/plugin install claude-code-ctx@claude-code-ctx`).
+
+---
 
 > **Claude Code context manager + personal dev memory engine.**
 > Token monitoring, auto-snapshot before `/clear`, tailored `/compact` prompt, ranked search across past sessions, system-prompt bloat audit, MCP tools that wrap heavy commands and cache their output, PreToolUse guardrails that catch risky Bash before it floods context.
