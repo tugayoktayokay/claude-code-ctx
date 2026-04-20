@@ -45,6 +45,7 @@ function collectProjectCandidates(memoryDir, config) {
   }
   files.sort((a, b) => b.mtime - a.mtime);
   const top = files.slice(0, maxCandidates);
+  const encoded = path.basename(path.dirname(memoryDir)) || null;
 
   const out = [];
   for (const f of top) {
@@ -58,6 +59,7 @@ function collectProjectCandidates(memoryDir, config) {
     out.push({
       name: f.name,
       path: f.path,
+      project: encoded,
       mtime: f.mtime,
       size: f.size,
       categories,
@@ -210,7 +212,36 @@ function scoreSnapshot(query, snap, config, corpus) {
 function rank(query, candidates, config) {
   const minScore = config?.retrieval?.min_score ?? 0.15;
   const topN     = config?.retrieval?.top_n     ?? 3;
-  const corpus   = candidates.length ? buildCorpusStats(candidates) : null;
+
+  const byProject = new Map();
+  const unkeyed   = [];
+  for (const c of candidates) {
+    if (c.project) {
+      if (!byProject.has(c.project)) byProject.set(c.project, []);
+      byProject.get(c.project).push(c);
+    } else {
+      unkeyed.push(c);
+    }
+  }
+
+  for (const [project, list] of byProject) {
+    const cp = cachePathForProject(project);
+    const cache = loadCache(cp);
+    const mutated = syncCache(cache, list);
+    if (mutated) saveCache(cp, cache);
+    for (const c of list) {
+      const entry = cache.get(c.path);
+      if (entry) {
+        c._terms = entry.terms;
+        c.length = entry.length || c.length;
+      }
+    }
+  }
+  for (const c of unkeyed) {
+    if (!c._terms) c._terms = tokenizeBody(c.body);
+  }
+
+  const corpus = candidates.length ? buildCorpusStats(candidates) : null;
   const scored = [];
   for (const c of candidates) {
     const s = scoreSnapshot(query, c, config, corpus);

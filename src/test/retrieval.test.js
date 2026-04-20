@@ -11,7 +11,8 @@ const { rank, scoreSnapshot, collectProjectCandidates } = require('../retrieval.
 
 function tmpMemory(files) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-ret-'));
-  const memoryDir = path.join(base, 'memory');
+  const projectDir = path.join(base, '-tmp-proj');
+  const memoryDir = path.join(projectDir, 'memory');
   fs.mkdirSync(memoryDir, { recursive: true });
   const now = Date.now();
   for (const { name, body, ageDays, categories } of files) {
@@ -215,4 +216,38 @@ test('syncCache tokenizes only new/changed snapshots and drops missing ones', ()
   assert.equal(cache.get('/a.md').mtime, 2000);
   assert.ok(cache.get('/a.md').terms.includes('content'));
   assert.ok(cache.has('/c.md'));
+});
+
+test('rank uses cache: warm and cold return identical ordering', () => {
+  const { base, memoryDir } = tmpMemory([
+    { name: 'project_s.md',  body: 'stripe webhook body',          ageDays: 1, categories: ['stripe'] },
+    { name: 'project_a.md',  body: 'jwt auth login flow',          ageDays: 2, categories: ['auth'] },
+    { name: 'project_s2.md', body: 'stripe subscription retry',    ageDays: 1, categories: ['stripe'] },
+  ]);
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-home-'));
+  const origHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const config = loadDefaults();
+    config.retrieval = { ...config.retrieval, top_n: 3, min_score: 0.01 };
+    const candidates = collectProjectCandidates(memoryDir, config);
+    const query = makeQuery('stripe webhook', config);
+
+    const cold = rank(query, candidates, config);
+    const warm = rank(query, candidates, config);
+
+    assert.deepEqual(
+      warm.map(r => r.snapshot.name),
+      cold.map(r => r.snapshot.name),
+      'warm and cold ordering must match'
+    );
+
+    const projectKey = path.basename(path.dirname(memoryDir));
+    const cachePath = path.join(tmpHome, '.config', 'ctx', 'bm25', `${projectKey}.json.gz`);
+    assert.ok(fs.existsSync(cachePath), 'cache file written');
+  } finally {
+    process.env.HOME = origHome;
+    fs.rmSync(base, { recursive: true, force: true });
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
 });
