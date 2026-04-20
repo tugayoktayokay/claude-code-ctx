@@ -35,7 +35,7 @@ Three layers stacked on Claude Code's hook + MCP systems:
 - **SessionStart** auto-injects the most recent snapshot — new sessions don't start from zero after `/clear`.
 - **Stop** at urgent+ level: writes a snapshot, gzips the full JSONL to `~/.config/ctx/backups/`, and copies a tailored `/compact` prompt to your clipboard. You paste with `⌘V`.
 - **PreCompact** adds focus/keep/drop guidance so `/compact` preserves the right stuff.
-- **PreToolUse** on Bash: catches `find /`, `ls -R`, unbounded `grep -r`, `cat /var/log/…` and similar, tells Claude to narrow scope before the command runs.
+- **PreToolUse** on Bash (15 rules): denies 4 unambiguously heavy patterns (`find /`, `grep -r`, `cat /var/log/`, `du -a`) with a reason pointing at the matching `ctx_shell` / `ctx_read` / `ctx_grep` wrapper; asks for 11 others (`ls -R`, `tree`, `journalctl`, `docker logs`, `kubectl logs`, `ps -ef`, `head/tail -n <big>`, `npm ls`, `git log`, `history`). All deny/ask events are logged as parseable single-line records in `~/.config/ctx/hooks.log`.
 - **PostToolUse** on Bash: every `git commit` triggers a snapshot (`trigger: commit` in frontmatter).
 - **UserPromptSubmit** on the first 1–2 prompts of a session: runs ranked search across past snapshots and injects the best match as `additionalContext`. Claude "remembers" how you solved X last time.
 

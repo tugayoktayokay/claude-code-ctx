@@ -188,7 +188,10 @@ function handlePreToolUse(input, config) {
     const action = mode === 'deny' ? 'deny' : mode === 'allow' ? 'allow' : 'ask';
     const reason = rule.reason || 'ctx: likely to produce heavy output — consider narrower scope';
 
-    logHook(config, `pre-tool-use ${action} tool=${toolName} rule="${rule.match}" reason="${reason}"`);
+    const cmdHead = String(cmd).slice(0, 40).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    const patternEsc = String(rule.match).replace(/"/g, '\\"');
+    const reasonEsc  = String(reason).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    logHook(config, `pre_tool action=${action} tool=${toolName} pattern="${patternEsc}" cmd_head="${cmdHead}" reason="${reasonEsc}"`);
 
     return {
       output: {

@@ -156,7 +156,7 @@ function parseByteLimit(v, fallback) {
 const wrapperTools = [
   {
     name: 'ctx_shell',
-    description: 'Run a shell command and return a summarized output if large. PREFER THIS OVER raw Bash for commands that may produce >5KB of output (ls -R, find, grep -r, logs, etc). Full output is cached; retrieve chunks via ctx_cache_get with the returned ref.',
+    description: 'Run a shell command. Returns inline if output <limit_bytes (default 5000), otherwise a ~500B summary plus a ref — full output cached, paginate via ctx_cache_get({ref,offset,limit}). **Use instead of raw Bash** for anything likely to produce >5KB: find, grep -r, ls -R, tree, journalctl, docker logs, du -a, large git log. Raw Bash dumps everything into context; this returns a summary.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -255,7 +255,7 @@ const wrapperTools = [
   },
   {
     name: 'ctx_read',
-    description: 'Read a file with automatic summarization if oversized. PREFER THIS OVER raw Read for files >5KB. Full content cached; retrieve via ctx_cache_get.',
+    description: 'Read a file. Returns inline if <limit_bytes (default 5000), otherwise head+tail summary + cached ref. **Use instead of raw cat/Read** for files >5KB, especially logs, generated output, or large JSON. Paginate full content via ctx_cache_get.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -293,7 +293,7 @@ const wrapperTools = [
   },
   {
     name: 'ctx_grep',
-    description: 'Search file contents with an enforced max-count. PREFER THIS OVER raw Grep when the result set may be large. Returns up to max_results matches inline, everything cached.',
+    description: 'Run grep with a pattern + path. Returns matches inline if <limit_bytes (default 5000), otherwise summary + cached ref. **Use instead of raw `grep -r`** — same semantics, safe against huge codebases. Paginate via ctx_cache_get.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -374,3 +374,64 @@ test('user-prompt-submit auto-retrieves past snapshot on first prompt', () => {
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test('pre-tool-use writes structured single-line log entry', () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-log-'));
+  const origHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const cfg = configWithDirs();
+    cfg.hooks.pre_tool_use = {
+      enabled: true,
+      default_mode: 'ask',
+      rules: [
+        { tool: 'Bash', match: '^\\s*find\\s+[/~]', mode: 'deny', reason: 'use ctx_shell' },
+      ],
+    };
+    const res = handlePreToolUse(
+      { tool_name: 'Bash', tool_input: { command: 'find / -name testfile' } },
+      cfg
+    );
+    assert.equal(res.output.hookSpecificOutput.permissionDecision, 'deny');
+
+    const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
+    const log = fs.readFileSync(logPath, 'utf8').trim().split('\n').pop();
+
+    // Structured format: <ISO8601> pre_tool action=X tool=Y pattern="..." cmd_head="..." reason="..."
+    assert.match(log, /^\S+Z pre_tool action=deny tool=Bash pattern=".+" cmd_head=".+" reason=".+"$/,
+      `log line did not match format: ${log}`);
+    assert.ok(log.includes('cmd_head="find / -name testfile"'), `cmd_head missing: ${log}`);
+    assert.ok(log.includes('reason="use ctx_shell"'), `reason missing: ${log}`);
+  } finally {
+    process.env.HOME = origHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('pre-tool-use log escapes embedded double quotes and newlines in cmd_head', () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-log-'));
+  const origHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const cfg = configWithDirs();
+    cfg.hooks.pre_tool_use = {
+      enabled: true,
+      default_mode: 'ask',
+      rules: [
+        { tool: 'Bash', match: '^\\s*find\\s', mode: 'deny', reason: 'heavy' },
+      ],
+    };
+    handlePreToolUse(
+      { tool_name: 'Bash', tool_input: { command: 'find / -name "x"\nfoo' } },
+      cfg
+    );
+    const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
+    const log = fs.readFileSync(logPath, 'utf8').trim().split('\n').pop();
+    // Inner double quote becomes \"
+    assert.ok(log.includes('cmd_head="find / -name \\"x\\" foo"'),
+      `expected escaped quotes + newline→space in cmd_head: ${log}`);
+  } finally {
+    process.env.HOME = origHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
