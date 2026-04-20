@@ -48,6 +48,7 @@ function ensureUserConfig() {
 module.exports = {
   DEFAULT_PATH,
   USER_PATH,
+  USER_DIR,
   loadDefaults,
   loadConfig,
   ensureUserConfig,

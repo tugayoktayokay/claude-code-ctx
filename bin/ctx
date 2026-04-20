@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
+const [major, minor] = process.versions.node.split('.').map(Number);
+if (major < 22 || (major === 22 && minor < 5)) {
+  console.error(`ctx requires Node >=22.5 (node:sqlite built-in). Current: v${process.versions.node}`);
+  process.exit(1);
+}
+
 const { main } = require('../src/cli.js');
 const result = main(process.argv);
 
