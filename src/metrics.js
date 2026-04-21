@@ -120,11 +120,16 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         const isCtxPost  = CTX_MCP_TOOL_RE.test(post.tool || '');
         if (!isBashPost && !isCtxPost) continue; // bystander — skip
         closed.add(j);
-        const exit = Number(post.exit || 0);
-        if (isBashPost && exit === 0) {
+        // exit='-' means unknown (Bash payload doesn't expose exit_code in real Claude
+        // Code PostToolUse — only `interrupted`). Treat unknown as success (bypassed),
+        // only non-zero numeric exit (e.g. 124 from interrupted=true) as failure.
+        const exitStr = String(post.exit ?? '-');
+        const exitNum = Number(exitStr);
+        const exitKnown = Number.isFinite(exitNum);
+        if (isBashPost && (!exitKnown || exitNum === 0)) {
           classification = pre.action === 'deny' ? 'bypassed' : 'user_approved';
           if (pre.action === 'deny') result.per_rule.get(patt).bypasses++;
-        } else if (isBashPost && exit !== 0) {
+        } else if (isBashPost && exitKnown && exitNum !== 0) {
           classification = pre.action === 'deny' ? 'bypass_failed' : 'approved_failed';
         } else if (isCtxPost) {
           classification = pre.action === 'deny' ? 'obeyed' : 'redirected';

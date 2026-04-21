@@ -218,12 +218,28 @@ async function handlePostToolUse(input, config) {
       ? String(ti.command || '')
       : JSON.stringify(ti);
     const cmdHead = rawHead.slice(0, 80).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    // Real PostToolUse payload shapes observed from Claude Code (2026-04-21):
+    //   Bash: tr = {stdout, stderr, interrupted, isImage, noOutputExpected}  — no content, no exit_code
+    //   Other: tr varies; some have `content` (string), some are the raw result
+    // size_bytes = actual output length (what Claude sees in context).
+    // exit: Bash hook payload does NOT expose exit code. We use `interrupted` as a rough
+    // signal (timeout/killed → 124-ish) and `-` when nothing is known. v0.7 correlator
+    // treats anything non-zero as bypass_failed; `-` parses as NaN and falls through to
+    // the Bash=0 branch (bypassed) — safe default.
     let sizeBytes = 0;
+    let exit = '-';
     if (tr && typeof tr === 'object') {
-      if (typeof tr.content === 'string') sizeBytes = tr.content.length;
-      else sizeBytes = JSON.stringify(tr).length;
+      if (toolName === 'Bash' && (typeof tr.stdout === 'string' || typeof tr.stderr === 'string')) {
+        sizeBytes = (tr.stdout || '').length + (tr.stderr || '').length;
+        exit = tr.interrupted ? 124 : 0;
+      } else if (typeof tr.content === 'string') {
+        sizeBytes = tr.content.length;
+        exit = (typeof tr.exit_code === 'number') ? tr.exit_code : 0;
+      } else {
+        sizeBytes = JSON.stringify(tr).length;
+        exit = (typeof tr.exit_code === 'number') ? tr.exit_code : '-';
+      }
     }
-    const exit = (tr && typeof tr.exit_code === 'number') ? tr.exit_code : 0;
     const sessionId = String(input.session_id || '-').replace(/\s+/g, '_');
     logHook(config, `post_tool session=${sessionId} tool=${toolName} cmd_head="${cmdHead}" exit=${exit} size_bytes=${sizeBytes}`);
   } catch {}

@@ -124,6 +124,16 @@ test('correlate: native Read bystander does not close pre; next ctx post wins', 
   assert.equal(r.pre_tool.deny.obeyed, 1);
 });
 
+test('correlate: Bash post with exit="-" (unknown) classified as bypassed, not bypass_failed', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', exit: '-' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.bypassed, 1);
+  assert.equal(r.pre_tool.deny.bypass_failed, 0);
+});
+
 test('correlate: native Grep bystander then nothing → abandoned', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },

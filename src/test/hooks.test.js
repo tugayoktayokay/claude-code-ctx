@@ -491,7 +491,7 @@ test('pre_tool log line writes session=- when session_id missing', async () => {
   }
 });
 
-test('post_tool logs size_bytes from tool_response.content string', async () => {
+test('post_tool Bash uses stdout+stderr length as size_bytes (real Claude Code payload shape)', async () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
   const prevHome = process.env.HOME;
   process.env.HOME = tmpHome;
@@ -503,12 +503,42 @@ test('post_tool logs size_bytes from tool_response.content string', async () => 
         session_id: 'xyz',
         tool_name: 'Bash',
         tool_input: { command: 'grep -r foo' },
-        tool_response: { content: 'a'.repeat(5000), exit_code: 0 },
+        tool_response: {
+          stdout: 'a'.repeat(4000),
+          stderr: 'b'.repeat(1000),
+          interrupted: false,
+          isImage: false,
+          noOutputExpected: false,
+        },
       },
       config,
     );
     const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
     assert.match(content, /post_tool session=xyz tool=Bash cmd_head="grep -r foo" exit=0 size_bytes=5000/);
+  } finally {
+    process.env.HOME = prevHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('post_tool Bash with interrupted=true logs exit=124', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = { hooks: { post_tool_use: { triggers: [] } } };
+    await hooks.handlePostToolUse(
+      {
+        session_id: 's',
+        tool_name: 'Bash',
+        tool_input: { command: 'sleep 999' },
+        tool_response: { stdout: '', stderr: '', interrupted: true },
+      },
+      config,
+    );
+    const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
+    assert.match(content, /post_tool session=s tool=Bash cmd_head="sleep 999" exit=124 size_bytes=0/);
   } finally {
     process.env.HOME = prevHome;
     fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -567,7 +597,7 @@ test('new Bash rules: rg/grep -R/egrep/awk/sed/wc/find coverage', () => {
   }
 });
 
-test('post_tool defaults size_bytes=0 when tool_response missing', async () => {
+test('post_tool with missing tool_response logs exit=- size_bytes=0', async () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
   const prevHome = process.env.HOME;
   process.env.HOME = tmpHome;
@@ -579,7 +609,7 @@ test('post_tool defaults size_bytes=0 when tool_response missing', async () => {
       config,
     );
     const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
-    assert.match(content, /post_tool session=s tool=Bash cmd_head="echo hi" exit=0 size_bytes=0/);
+    assert.match(content, /post_tool session=s tool=Bash cmd_head="echo hi" exit=- size_bytes=0/);
   } finally {
     process.env.HOME = prevHome;
     fs.rmSync(tmpHome, { recursive: true, force: true });
