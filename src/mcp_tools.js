@@ -167,7 +167,7 @@ const wrapperTools = [
       },
       required: ['command'],
     },
-    handler: async (args, { config: _config, signal, sendProgress } = {}) => {
+    handler: async (args, { config, signal, sendProgress } = {}) => {
       const command    = String(args.command || '');
       const cwd        = args.cwd || process.cwd();
       const limitBytes = parseByteLimit(args.limit_bytes, 5000);
@@ -235,7 +235,7 @@ const wrapperTools = [
             return;
           }
 
-          const cached = cache.writeCache(combined);
+          const cached = cache.writeCache(combined, { gc: (config && config.cache && config.cache.gc) || {} });
           const summary = cache.summarizeLines(combined, { head: 25, tail: 10 });
           resolve(okText([
             `[ctx_shell ${status}, ${combined.length}B → summarized]`,
@@ -265,7 +265,7 @@ const wrapperTools = [
       },
       required: ['path'],
     },
-    handler: async (args, { config: _config }) => {
+    handler: async (args, { config }) => {
       const filePath   = String(args.path || '');
       const offset     = args.offset || 0;
       const limitBytes = parseByteLimit(args.limit_bytes, 5000);
@@ -281,7 +281,7 @@ const wrapperTools = [
         return okText(`[ctx_read ${filePath}, ${slice.length}B]\n${slice}`);
       }
 
-      const cached = cache.writeCache(content);
+      const cached = cache.writeCache(content, { gc: (config && config.cache && config.cache.gc) || {} });
       const summary = cache.summarizeLines(slice, { head: 30, tail: 10 });
       return okText([
         `[ctx_read ${filePath}, ${content.length}B → summarized]`,
@@ -304,7 +304,7 @@ const wrapperTools = [
       },
       required: ['pattern'],
     },
-    handler: async (args, { config: _config }) => {
+    handler: async (args, { config }) => {
       const pattern    = String(args.pattern || '');
       const searchPath = args.path || process.cwd();
       const maxResults = args.max_results || 100;
@@ -331,7 +331,7 @@ const wrapperTools = [
         return okText(`[ctx_grep ${stdout.split('\n').filter(Boolean).length} matches]\n${stdout}`);
       }
 
-      const cached = cache.writeCache(stdout);
+      const cached = cache.writeCache(stdout, { gc: (config && config.cache && config.cache.gc) || {} });
       const summary = cache.summarizeLines(stdout, { head: 40, tail: 5 });
       return okText([
         `[ctx_grep ${stdout.length}B of matches → summarized]`,

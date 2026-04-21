@@ -46,6 +46,14 @@
     "auto_index_update": true,
     "dedup_window_n": 3
   },
+  "cache": {
+    "gc": {
+      "enabled": true,
+      "ttl_hours": 24,
+      "max_bytes": 104857600,
+      "sweep_probability": 0.05
+    }
+  },
   "backup": {
     "enabled": true,
     "dir": "~/.config/ctx/backups",
