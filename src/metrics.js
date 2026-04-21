@@ -85,7 +85,11 @@ function parseLog(input) {
 
 // Verified against Claude Code plugin MCP on 2026-04-21:
 // ctx plugin tools emit tool_name as mcp__ctx__ctx_<grep|read|shell>.
-const CTX_MCP_TOOL_RE = /^mcp__ctx__ctx_(grep|read|shell)$/;
+// Verified against real Claude Code PostToolUse payload on 2026-04-22:
+// - Plugin-installed: tool_name = "mcp__plugin_claude-code-ctx_ctx__ctx_grep"
+// - Direct MCP (if user adds to .mcp.json): "mcp__ctx__ctx_grep"
+// Both forms must match so metrics work regardless of install method.
+const CTX_MCP_TOOL_RE = /^mcp__(?:plugin_claude-code-ctx_)?ctx__ctx_(grep|read|shell)$/;
 const WINDOW_SECONDS_DEFAULT = 60;
 
 function toMs(ts) { return Date.parse(ts); }

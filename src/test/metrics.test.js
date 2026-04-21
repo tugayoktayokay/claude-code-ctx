@@ -140,6 +140,27 @@ test('correlate: native Read bystander does not close pre; next ctx post wins', 
   assert.equal(r.pre_tool.deny.obeyed, 1);
 });
 
+test('correlate: plugin-form MCP tool name (real Claude Code format) → obeyed', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'mcp__plugin_claude-code-ctx_ctx__ctx_grep', exit: '-' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 1);
+  assert.equal(r.pre_tool.deny.abandoned, 0);
+});
+
+test('correlate: ctx_cache_get is bystander (NOT in the obey bucket)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:05.000Z', session: 'S', tool: 'mcp__plugin_claude-code-ctx_ctx__ctx_cache_get', exit: '-' },
+  ];
+  const r = correlate(records);
+  // cache_get is a bystander — no classification bucket was reached
+  assert.equal(r.pre_tool.deny.obeyed, 0);
+  assert.equal(r.pre_tool.deny.abandoned, 1);
+});
+
 test('correlate: Bash post with exit="-" (unknown) classified as bypassed, not bypass_failed', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
