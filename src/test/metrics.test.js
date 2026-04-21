@@ -36,6 +36,22 @@ test('parseLine marks unrecognized event as error', () => {
   assert.equal(r.error, 'unknown event type');
 });
 
+test('parseLine silently ignores legitimate non-metric events (no parse error)', () => {
+  const samples = [
+    '2026-04-21T10:00:00.000Z session-start restored project_x.md (68 bytes)',
+    '2026-04-21T10:00:00.000Z stop clipboard_compact level=urgent prompt_len=37',
+    '2026-04-21T10:00:00.000Z pre-compact level=critical userInput=no',
+    '2026-04-21T10:00:00.000Z pre-tool-use ask tool=Bash rule="^grep -r" reason="redirect"',
+    '2026-04-21T10:00:00.000Z post-tool-use snapshot tool=Bash dedup=false',
+    '2026-04-21T10:00:00.000Z auto-retrieve prompt_turn=1 score=0.73',
+  ];
+  for (const line of samples) {
+    const r = parseLine(line);
+    assert.equal(r.record, null, `should not emit a record for: ${line}`);
+    assert.equal(r.error, null, `should NOT count as parse error: ${line}`);
+  }
+});
+
 test('parseLine marks no-timestamp line as error', () => {
   const r = parseLine('this line is not valid and should be skipped by the parser');
   assert.equal(r.record, null);

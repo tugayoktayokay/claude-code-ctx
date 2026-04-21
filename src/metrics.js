@@ -4,12 +4,27 @@ const fs = require('fs');
 
 const EVENT_TYPES = ['pre_tool', 'post_tool', 'cache-write', 'cache-read', 'cache-gc'];
 
+// Legitimate hook events emitted by pre-v0.7 ctx (and by other hook actions like
+// session-start/stop/auto-retrieve/pre-compact). They are not consumed by metrics.js
+// but they are not malformed either — skip silently instead of counting them as
+// parse errors.
+const IGNORED_EVENT_TYPES = new Set([
+  'session-start',
+  'stop',
+  'pre-compact',
+  'pre-tool-use',
+  'post-tool-use',
+  'auto-retrieve',
+  'hook',
+]);
+
 function parseLine(line) {
-  // Returns { record, error } — record is null if line is malformed.
-  if (!line.trim()) return { record: null, error: null }; // blank line: skip
+  // Returns { record, error } — record is null if line is malformed or silently skipped.
+  if (!line.trim()) return { record: null, error: null };
   const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\s+(\S+)\s*(.*)$/);
   if (!tsMatch) return { record: null, error: 'no timestamp' };
   const [, ts, evType, rest] = tsMatch;
+  if (IGNORED_EVENT_TYPES.has(evType)) return { record: null, error: null };
   if (!EVENT_TYPES.includes(evType)) return { record: null, error: 'unknown event type' };
   const kv = parseKeyValues(rest);
   return { record: { ts, evType, ...kv }, error: null };
@@ -206,4 +221,4 @@ function aggregate(logPath, { now = Date.now(), rangeDays = 7, windowSeconds = 6
   };
 }
 
-module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, correlate, CTX_MCP_TOOL_RE, aggregate, aggregateCache };
+module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, IGNORED_EVENT_TYPES, correlate, CTX_MCP_TOOL_RE, aggregate, aggregateCache };
