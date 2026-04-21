@@ -68,4 +68,93 @@ function parseLog(input) {
   return parseLogString(input);
 }
 
-module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES };
+const CTX_MCP_TOOL_RE = /^mcp__ctx__ctx_(grep|read|shell)$/;
+const WINDOW_SECONDS_DEFAULT = 60;
+
+function toMs(ts) { return Date.parse(ts); }
+
+function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
+  const bySession = new Map();
+  for (const r of records) {
+    if (!r.session) continue;
+    if (!bySession.has(r.session)) bySession.set(r.session, []);
+    bySession.get(r.session).push(r);
+  }
+
+  const result = {
+    deny:  { total: 0, obeyed: 0, bypassed: 0, bypass_failed: 0, abandoned: 0 },
+    ask:   { total: 0, user_approved: 0, redirected: 0, canceled: 0, approved_failed: 0 },
+    per_rule: new Map(),
+    unscoped: 0,
+  };
+
+  for (const [sid, events] of bySession.entries()) {
+    events.sort((a, b) => toMs(a.ts) - toMs(b.ts));
+    if (sid === '-') {
+      result.unscoped += events.length;
+      continue;
+    }
+    const closed = new Set();
+    for (let i = 0; i < events.length; i++) {
+      const pre = events[i];
+      if (pre.evType !== 'pre_tool') continue;
+      if (pre.action !== 'deny' && pre.action !== 'ask') continue;
+
+      const bucket = pre.action === 'deny' ? result.deny : result.ask;
+      bucket.total++;
+      const patt = pre.pattern || '';
+      if (!result.per_rule.has(patt)) result.per_rule.set(patt, { triggers: 0, bypasses: 0 });
+      result.per_rule.get(patt).triggers++;
+
+      const preMs = toMs(pre.ts);
+      let classification = null;
+      for (let j = i + 1; j < events.length; j++) {
+        const post = events[j];
+        if (post.evType !== 'post_tool') continue;
+        if (closed.has(j)) continue;
+        const dt = (toMs(post.ts) - preMs) / 1000;
+        if (dt > windowSeconds) break;
+        const isBashPost = post.tool === 'Bash';
+        const isCtxPost  = CTX_MCP_TOOL_RE.test(post.tool || '');
+        if (!isBashPost && !isCtxPost) continue; // bystander — skip
+        closed.add(j);
+        const exit = Number(post.exit || 0);
+        if (isBashPost && exit === 0) {
+          classification = pre.action === 'deny' ? 'bypassed' : 'user_approved';
+          if (pre.action === 'deny') result.per_rule.get(patt).bypasses++;
+        } else if (isBashPost && exit !== 0) {
+          classification = pre.action === 'deny' ? 'bypass_failed' : 'approved_failed';
+        } else if (isCtxPost) {
+          classification = pre.action === 'deny' ? 'obeyed' : 'redirected';
+        }
+        break;
+      }
+      if (!classification) {
+        classification = pre.action === 'deny' ? 'abandoned' : 'canceled';
+      }
+      bucket[classification]++;
+    }
+  }
+
+  const per_rule = Array.from(result.per_rule.entries())
+    .map(([pattern, v]) => ({
+      pattern,
+      triggers: v.triggers,
+      bypasses: v.bypasses,
+      bypass_rate: v.triggers ? v.bypasses / v.triggers : 0,
+    }))
+    .sort((a, b) => b.bypass_rate - a.bypass_rate || b.bypasses - a.bypasses)
+    .slice(0, 10);
+
+  return {
+    pre_tool: {
+      total: result.deny.total + result.ask.total,
+      deny: result.deny,
+      ask:  result.ask,
+    },
+    per_rule,
+    unscoped: result.unscoped,
+  };
+}
+
+module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, correlate, CTX_MCP_TOOL_RE };

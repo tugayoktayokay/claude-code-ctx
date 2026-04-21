@@ -77,3 +77,103 @@ test('parseLog with Buffer works', () => {
   const r = parseLog(buf);
   assert.equal(r.records.length, 1);
 });
+
+const { correlate } = require('../metrics.js');
+
+test('correlate: deny + ctx_grep post within window → obeyed', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'mcp__ctx__ctx_grep', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.total, 1);
+  assert.equal(r.pre_tool.deny.obeyed, 1);
+  assert.equal(r.pre_tool.deny.bypassed, 0);
+});
+
+test('correlate: deny + Bash post exit=0 → bypassed, per_rule updated', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^find' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:20.000Z', session: 'S', tool: 'Bash', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.bypassed, 1);
+  assert.equal(r.per_rule[0].pattern, '^find');
+  assert.equal(r.per_rule[0].bypasses, 1);
+  assert.equal(r.per_rule[0].bypass_rate, 1);
+});
+
+test('correlate: deny + Bash post exit=1 → bypass_failed, not bypassed', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:15.000Z', session: 'S', tool: 'Bash', exit: '1' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.bypass_failed, 1);
+  assert.equal(r.pre_tool.deny.bypassed, 0);
+  assert.equal(r.per_rule[0].bypasses, 0);
+});
+
+test('correlate: native Read bystander does not close pre; next ctx post wins', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:03.000Z', session: 'S', tool: 'Read', exit: '0' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:12.000Z', session: 'S', tool: 'mcp__ctx__ctx_grep', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 1);
+});
+
+test('correlate: native Grep bystander then nothing → abandoned', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:05.000Z', session: 'S', tool: 'Grep', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.abandoned, 1);
+});
+
+test('correlate: two consecutive pre, one post → first obeyed, second abandoned', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:30.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:45.000Z', session: 'S', tool: 'mcp__ctx__ctx_grep', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 1);
+  assert.equal(r.pre_tool.deny.abandoned, 1);
+});
+
+test('correlate: ask + Bash exit=0 → user_approved', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'ask', tool: 'Bash', pattern: '^ls' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.ask.user_approved, 1);
+});
+
+test('correlate: session=- events go to unscoped bucket, not correlated', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: '-', action: 'deny', tool: 'Bash', pattern: '^x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: '-', tool: 'Bash', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.unscoped, 2);
+  assert.equal(r.pre_tool.deny.total, 0);
+});
+
+test('correlate end-to-end on canonical fixture', () => {
+  const { records } = parseLog(FIXTURE);
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.total, 8);
+  assert.equal(r.pre_tool.deny.obeyed, 3);
+  assert.equal(r.pre_tool.deny.bypassed, 2);
+  assert.equal(r.pre_tool.deny.bypass_failed, 1);
+  assert.equal(r.pre_tool.deny.abandoned, 2);
+  assert.equal(r.pre_tool.ask.total, 3);
+  assert.equal(r.pre_tool.ask.user_approved, 1);
+  assert.equal(r.pre_tool.ask.redirected, 1);
+  assert.equal(r.pre_tool.ask.canceled, 1);
+  assert.equal(r.unscoped, 2);
+});
