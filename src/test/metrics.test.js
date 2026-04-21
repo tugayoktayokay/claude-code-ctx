@@ -15,6 +15,20 @@ test('parseKeyValues handles bareword and quoted values with escapes', () => {
   assert.equal(kv.cmd_head, 'grep "foo" .');
 });
 
+test('parseKeyValues preserves regex backslashes (not only \\" unescape)', () => {
+  // Real log line written by hooks.js for the find rule:
+  //   pattern="^\s*find\s+[/~]"
+  // The reader must preserve \s and \+ exactly, only unescape \" and \\.
+  const kv = parseKeyValues('pattern="^\\s*find\\s+[/~]" cmd_head="find / -name x"');
+  assert.equal(kv.pattern, '^\\s*find\\s+[/~]');
+  assert.equal(kv.cmd_head, 'find / -name x');
+});
+
+test('parseKeyValues correctly unescapes \\\\ to single backslash', () => {
+  const kv = parseKeyValues('path="C:\\\\Users\\\\foo"');
+  assert.equal(kv.path, 'C:\\Users\\foo');
+});
+
 test('parseLine returns record for pre_tool', () => {
   const { record, error } = parseLine('2026-04-21T10:00:00.000Z pre_tool session=S1 action=deny tool=Bash pattern="^x" cmd_head="x" reason="r"');
   assert.equal(error, null);

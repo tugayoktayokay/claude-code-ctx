@@ -45,7 +45,11 @@ function parseKeyValues(rest) {
       i++;
       let value = '';
       while (i < rest.length) {
-        if (rest[i] === '\\' && rest[i + 1] !== undefined) { value += rest[i + 1]; i += 2; continue; }
+        // Only unescape \" → " and \\ → \. Leave \s, \+, \d etc. literal — they are
+        // regex patterns in rule.match and must survive the round-trip unchanged.
+        if (rest[i] === '\\' && (rest[i + 1] === '"' || rest[i + 1] === '\\')) {
+          value += rest[i + 1]; i += 2; continue;
+        }
         if (rest[i] === '"') { i++; break; }
         value += rest[i]; i++;
       }
