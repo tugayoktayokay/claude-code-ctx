@@ -1,0 +1,39 @@
+2026-04-21T10:00:00.000Z pre_tool session=S1 action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r foo src" reason="Use ctx_grep"
+2026-04-21T10:00:10.000Z post_tool session=S1 tool=mcp__ctx__ctx_grep cmd_head="{\"pattern\":\"foo\",\"path\":\"src\"}" exit=0 size_bytes=4800
+
+2026-04-21T10:01:00.000Z pre_tool session=S1 action=deny tool=Bash pattern="^find /" cmd_head="find / -name x" reason="Use ctx_shell"
+2026-04-21T10:01:20.000Z post_tool session=S1 tool=Bash cmd_head="find / -name x" exit=0 size_bytes=120000
+
+2026-04-21T10:02:00.000Z pre_tool session=S1 action=deny tool=Bash pattern="^cat /var/log" cmd_head="cat /var/log/sys" reason="Use ctx_read"
+2026-04-21T10:02:15.000Z post_tool session=S1 tool=Bash cmd_head="cat /var/log/sys" exit=1 size_bytes=0
+
+2026-04-21T10:03:00.000Z pre_tool session=S1 action=deny tool=Bash pattern="^du -a" cmd_head="du -a /" reason="Use du -sh"
+
+2026-04-21T10:05:00.000Z pre_tool session=S2 action=ask tool=Bash pattern="^ls -R" cmd_head="ls -R ." reason="Scope it"
+2026-04-21T10:05:10.000Z post_tool session=S2 tool=Bash cmd_head="ls -R ." exit=0 size_bytes=3000
+
+2026-04-21T10:06:00.000Z pre_tool session=S2 action=ask tool=Bash pattern="^journalctl" cmd_head="journalctl -f" reason="Add -n"
+2026-04-21T10:06:05.000Z post_tool session=S2 tool=mcp__ctx__ctx_shell cmd_head="{\"command\":\"journalctl -n 200\"}" exit=0 size_bytes=1500
+
+2026-04-21T10:07:00.000Z pre_tool session=S2 action=ask tool=Bash pattern="^docker logs" cmd_head="docker logs abc" reason="Add --tail"
+
+2026-04-21T10:08:00.000Z pre_tool session=S3 action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r bar ." reason="Use ctx_grep"
+2026-04-21T10:08:03.000Z post_tool session=S3 tool=Read cmd_head="{\"file_path\":\"/tmp/notes\"}" exit=0 size_bytes=500
+2026-04-21T10:08:12.000Z post_tool session=S3 tool=mcp__ctx__ctx_grep cmd_head="{\"pattern\":\"bar\"}" exit=0 size_bytes=2200
+
+2026-04-21T10:09:00.000Z pre_tool session=S3 action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r baz ." reason="Use ctx_grep"
+2026-04-21T10:09:05.000Z post_tool session=S3 tool=Bash cmd_head="grep -r baz ." exit=0 size_bytes=55000
+
+2026-04-21T10:10:00.000Z pre_tool session=S3 action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r qux ." reason="Use ctx_grep"
+2026-04-21T10:10:30.000Z pre_tool session=S3 action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r zzz ." reason="Use ctx_grep"
+2026-04-21T10:10:45.000Z post_tool session=S3 tool=mcp__ctx__ctx_grep cmd_head="{\"pattern\":\"qux\"}" exit=0 size_bytes=900
+
+2026-04-21T10:11:00.000Z pre_tool session=- action=deny tool=Bash pattern="^grep -r" cmd_head="grep -r y ." reason="Use ctx_grep"
+2026-04-21T10:11:05.000Z post_tool session=- tool=Bash cmd_head="grep -r y ." exit=0 size_bytes=7000
+
+this line is not valid and should be skipped by the parser
+
+2026-04-21T10:12:00.000Z cache-write ref=a1b2c3d4e5f6 bytes=45312
+2026-04-21T10:12:10.000Z cache-read ref=a1b2c3d4e5f6 result=hit bytes=4000
+2026-04-21T10:12:20.000Z cache-read ref=deadbeef0000 result=miss bytes=0
+2026-04-21T10:13:00.000Z cache-gc swept=3 bytes_freed=81788928
