@@ -68,6 +68,8 @@ function parseLog(input) {
   return parseLogString(input);
 }
 
+// Verified against Claude Code plugin MCP on 2026-04-21:
+// ctx plugin tools emit tool_name as mcp__ctx__ctx_<grep|read|shell>.
 const CTX_MCP_TOOL_RE = /^mcp__ctx__ctx_(grep|read|shell)$/;
 const WINDOW_SECONDS_DEFAULT = 60;
 
