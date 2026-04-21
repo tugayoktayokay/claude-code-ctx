@@ -157,4 +157,46 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
   };
 }
 
-module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, correlate, CTX_MCP_TOOL_RE };
+const MS_PER_DAY = 24 * 3600 * 1000;
+
+function withinRange(ts, now, rangeDays) {
+  const cutoff = now - rangeDays * MS_PER_DAY;
+  return toMs(ts) >= cutoff;
+}
+
+function aggregateCache(records) {
+  let writes = 0, reads = 0, read_hits = 0, read_misses = 0;
+  let gc_sweeps = 0, gc_evicted = 0, gc_bytes_freed = 0;
+  for (const r of records) {
+    if (r.evType === 'cache-write') writes++;
+    else if (r.evType === 'cache-read') {
+      reads++;
+      if (r.result === 'hit') read_hits++;
+      else if (r.result === 'miss') read_misses++;
+    } else if (r.evType === 'cache-gc') {
+      gc_sweeps++;
+      gc_evicted     += Number(r.swept || 0);
+      gc_bytes_freed += Number(r.bytes_freed || 0);
+    }
+  }
+  const hit_rate = reads ? read_hits / reads : 0;
+  return { writes, reads, read_hits, read_misses, hit_rate, gc_sweeps, gc_evicted, gc_bytes_freed };
+}
+
+function aggregate(logPath, { now = Date.now(), rangeDays = 7, windowSeconds = 60 } = {}) {
+  const { records, parseErrors } = parseLog(logPath);
+  const inRange = records.filter(r => withinRange(r.ts, now, rangeDays));
+  const corr = correlate(inRange, { windowSeconds });
+  const cache = aggregateCache(inRange);
+  return {
+    range_days: rangeDays,
+    window_seconds: windowSeconds,
+    pre_tool: corr.pre_tool,
+    per_rule: corr.per_rule,
+    cache,
+    unscoped: corr.unscoped,
+    parse_errors: parseErrors,
+  };
+}
+
+module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, correlate, CTX_MCP_TOOL_RE, aggregate, aggregateCache };

@@ -177,3 +177,41 @@ test('correlate end-to-end on canonical fixture', () => {
   assert.equal(r.pre_tool.ask.canceled, 1);
   assert.equal(r.unscoped, 2);
 });
+
+const { aggregate, aggregateCache } = require('../metrics.js');
+
+test('aggregate produces full record shape on canonical fixture', () => {
+  const r = aggregate(FIXTURE, { now: Date.parse('2026-04-21T10:15:00.000Z'), rangeDays: 7 });
+  assert.equal(r.range_days, 7);
+  assert.equal(r.window_seconds, 60);
+  assert.equal(r.pre_tool.total, 11);
+  assert.equal(r.pre_tool.deny.total, 8);
+  assert.equal(r.pre_tool.ask.total, 3);
+  assert.equal(r.cache.writes, 1);
+  assert.equal(r.cache.reads, 2);
+  assert.equal(r.cache.read_hits, 1);
+  assert.equal(r.cache.read_misses, 1);
+  assert.equal(r.cache.hit_rate, 0.5);
+  assert.equal(r.cache.gc_sweeps, 1);
+  assert.equal(r.unscoped, 2);
+  assert.equal(r.parse_errors, 1);
+});
+
+test('aggregate excludes events outside range', () => {
+  const r = aggregate(FIXTURE, { now: Date.parse('2026-05-01T00:00:00.000Z'), rangeDays: 1 });
+  assert.equal(r.pre_tool.total, 0);
+  assert.equal(r.cache.writes, 0);
+});
+
+test('aggregate with empty log returns zero record, no division by zero', () => {
+  const emptyPath = path.join(__dirname, 'fixtures', 'empty.log');
+  require('fs').writeFileSync(emptyPath, '');
+  try {
+    const r = aggregate(emptyPath, { now: Date.now() });
+    assert.equal(r.pre_tool.total, 0);
+    assert.equal(r.cache.hit_rate, 0);
+    assert.equal(r.parse_errors, 0);
+  } finally {
+    require('fs').unlinkSync(emptyPath);
+  }
+});
