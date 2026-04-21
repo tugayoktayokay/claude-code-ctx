@@ -539,6 +539,34 @@ test('post_tool logs non-Bash tool with args_head', async () => {
   }
 });
 
+test('new Bash rules: rg/grep -R/egrep/awk/sed/wc/find coverage', () => {
+  const { loadConfig } = require('../config.js');
+  const config = loadConfig();
+  const rules = config.hooks.pre_tool_use.rules;
+
+  const testCases = [
+    ['rg -r foo src',                  true,  'rg recursive'],
+    ['rg --recursive foo src',         true,  'rg --recursive'],
+    ['rg foo src',                     false, 'rg bounded (default head_limit)'],
+    ['grep -R foo src',                true,  'grep -R capital'],
+    ['egrep -r foo src',               true,  'egrep recursive'],
+    [`awk '{print}' file.txt`,         true,  'awk unbounded'],
+    [`sed 's/a/b/' file.txt`,          true,  'sed unbounded'],
+    ['wc -l src/**/*.js',              true,  'wc -l glob'],
+    ['find . -name x -print',          true,  'find without -maxdepth'],
+    ['find . -maxdepth 3 -name x -print', false, 'find with -maxdepth (first)'],
+    ['find . -name x -maxdepth 3 -print', false, 'find with -maxdepth (middle)'],
+  ];
+
+  for (const [cmd, expectMatch, label] of testCases) {
+    const matched = rules.some(r => {
+      if (r.tool !== 'Bash') return false;
+      try { return new RegExp(r.match).test(cmd); } catch { return false; }
+    });
+    assert.equal(matched, expectMatch, `[${label}] "${cmd}" expected ${expectMatch ? 'match' : 'no-match'}`);
+  }
+});
+
 test('post_tool defaults size_bytes=0 when tool_response missing', async () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
   const prevHome = process.env.HOME;

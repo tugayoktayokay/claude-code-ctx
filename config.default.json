@@ -104,7 +104,13 @@
         { "tool": "Bash", "match": "^\\s*kubectl\\s+logs(\\s|$)(?!.*--tail)", "reason": "Pod logs need --tail N. Use kubectl logs --tail 200 <pod>." },
         { "tool": "Bash", "match": "^\\s*ps\\s+-ef(\\s|$)",               "reason": "Full process list is noisy. Use pgrep <name> or ps -ef | grep <pattern>." },
         { "tool": "Bash", "match": "^\\s*head\\s+-n\\s+\\d{4,}",          "reason": "head -n with 4+ digit count. Use ctx_read({path, limit_bytes: 5000})." },
-        { "tool": "Bash", "match": "^\\s*tail\\s+-n\\s+\\d{4,}",          "reason": "tail -n with 4+ digit count. Use ctx_read or a smaller -n." }
+        { "tool": "Bash", "match": "^\\s*tail\\s+-n\\s+\\d{4,}",          "reason": "tail -n with 4+ digit count. Use ctx_read or a smaller -n." },
+        { "tool": "Bash", "match": "^\\s*rg\\s+(?:.*\\s)?(-r|--recursive)(\\s|$)", "reason": "rg recursive is the same footgun as grep -r. Use ctx_grep({pattern, path}) — inline if small, summary+ref if big." },
+        { "tool": "Bash", "match": "^\\s*grep\\s+-R(\\s|$)", "reason": "grep -R (capital) is recursive. Use ctx_grep." },
+        { "tool": "Bash", "match": "^\\s*egrep\\s+-r(\\s|$)", "reason": "egrep -r same as grep -r. Use ctx_grep." },
+        { "tool": "Bash", "match": "^\\s*(awk|sed)\\s+['\"][^'\"]+['\"]\\s+[^-|]", "reason": "awk/sed over a file without a bounded pipeline can emit the full file. Pipe through head -N, or use ctx_read." },
+        { "tool": "Bash", "match": "^\\s*wc\\s+-l\\s+[^|]*\\*", "reason": "wc -l on a glob can stat thousands. Scope to a subdir, or use ctx_shell for a summary." },
+        { "tool": "Bash", "match": "^(?!.*-maxdepth)\\s*find\\s+\\.\\s.*-print", "reason": "find without -maxdepth prints everything. Add -maxdepth N or use ctx_shell." }
       ]
     },
     "post_tool_use": {
