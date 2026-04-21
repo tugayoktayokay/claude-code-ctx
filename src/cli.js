@@ -1009,9 +1009,13 @@ function main(argv) {
       return 0;
     case '--version':
     case '-v':
-    case 'version':
-      console.log(require('../package.json').version);
+    case 'version': {
+      const pkg = require('../package.json');
+      const installPath = path.resolve(__dirname, '..');
+      console.log(`${pkg.name} ${pkg.version}`);
+      console.log(`  install: ${installPath}`);
       return 0;
+    }
     default:
       if (cmd && !cmd.startsWith('-') && fs.existsSync(path.resolve(cmd))) {
         return runAnalyzeCmd([cmd], config);
