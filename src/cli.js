@@ -703,6 +703,59 @@ function runMetrics(_args, _config) {
   }
 }
 
+function runPluginFix(_args, _config) {
+  // Workaround for a Claude Code plugin-manager bug where `/plugin update` or
+  // `autoUpdate` removes the cache directory but doesn't regenerate it, leaving
+  // installed_plugins.json pointing at a nonexistent path and every hook emitting
+  // "Plugin directory does not exist". We detect that state and copy the
+  // marketplace checkout (stable git clone at ~/.claude/plugins/marketplaces/...)
+  // into the expected cache path.
+  const os = require('os');
+  const { execSync } = require('child_process');
+  const home = os.homedir();
+  const recordPath = path.join(home, '.claude', 'plugins', 'installed_plugins.json');
+  if (!fs.existsSync(recordPath)) {
+    console.error('❌ no installed_plugins.json at ' + recordPath);
+    return 1;
+  }
+  let record;
+  try { record = JSON.parse(fs.readFileSync(recordPath, 'utf8')); } catch (err) {
+    console.error('❌ cannot parse installed_plugins.json: ' + err.message);
+    return 1;
+  }
+  const entries = Object.entries(record.plugins || {}).filter(([k]) => k.includes('ctx'));
+  if (!entries.length) {
+    console.error('❌ no ctx plugin entry in installed_plugins.json');
+    return 1;
+  }
+  let fixed = 0;
+  for (const [name, installs] of entries) {
+    for (const install of installs) {
+      const expected = install.installPath;
+      if (!expected) continue;
+      if (fs.existsSync(expected)) {
+        console.log(`  ✓ ${name} cache OK at ${expected}`);
+        continue;
+      }
+      const marketplace = path.join(home, '.claude', 'plugins', 'marketplaces', 'claude-code-ctx');
+      if (!fs.existsSync(marketplace)) {
+        console.error(`  ❌ marketplace missing: ${marketplace} — run /plugin install claude-code-ctx@claude-code-ctx`);
+        continue;
+      }
+      console.log(`  ⟳ ${name} cache missing → copying from ${marketplace}`);
+      fs.mkdirSync(path.dirname(expected), { recursive: true });
+      execSync(`cp -R "${marketplace}" "${expected}"`);
+      fixed++;
+    }
+  }
+  if (fixed > 0) {
+    console.log(`  ✓ fixed ${fixed} plugin install(s). Restart Claude Code session to clear stale hook references.`);
+  } else {
+    console.log('  ✓ nothing to fix — all cache paths resolve.');
+  }
+  return 0;
+}
+
 function runDiff(args, config) {
   stripColor();
   if (args.length < 2) {
@@ -921,6 +974,8 @@ function main(argv) {
       return runStats(rest, config);
     case 'metrics':
       return runMetrics(rest, config);
+    case 'plugin-fix':
+      return runPluginFix(rest, config);
     case 'bloat':
       return runBloat(rest, config);
     case 'usage':
