@@ -4,7 +4,7 @@
 [![plugin](https://img.shields.io/badge/Claude%20Code-plugin-blueviolet)](#install)
 [![license](https://img.shields.io/npm/l/claude-code-ctx.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/claude-code-ctx.svg)](https://nodejs.org)
-[![tests](https://img.shields.io/badge/tests-123%20passing-brightgreen.svg)](src/test)
+[![tests](https://img.shields.io/badge/tests-174%20passing-brightgreen.svg)](src/test)
 [![deps](https://img.shields.io/badge/deps-0-brightgreen.svg)](package.json)
 
 > ## ⚠️ Prefer the Claude Code plugin install — npm is a fallback
@@ -23,7 +23,7 @@
 
 > 📦 **Package name:** `claude-code-ctx` (npm) / `claude-code-ctx@claude-code-ctx` (Claude Code plugin)
 > 💻 **CLI binary:** `ctx` (short, what you type in terminal)
-> 🪝 **Slash commands:** `/ctx-doctor`, `/ctx-ask`, … (20 commands, see below)
+> 🪝 **Slash commands:** `/ctx-doctor`, `/ctx-ask`, `/ctx-metrics`, … (29 commands, see below)
 
 ---
 
@@ -35,8 +35,8 @@ Three layers stacked on Claude Code's hook + MCP systems:
 - **SessionStart** auto-injects the most recent snapshot — new sessions don't start from zero after `/clear`.
 - **Stop** at urgent+ level: writes a snapshot, gzips the full JSONL to `~/.config/ctx/backups/`, and copies a tailored `/compact` prompt to your clipboard. You paste with `⌘V`.
 - **PreCompact** adds focus/keep/drop guidance so `/compact` preserves the right stuff.
-- **PreToolUse** on Bash (15 rules): denies 4 unambiguously heavy patterns (`find /`, `grep -r`, `cat /var/log/`, `du -a`) with a reason pointing at the matching `ctx_shell` / `ctx_read` / `ctx_grep` wrapper; asks for 11 others (`ls -R`, `tree`, `journalctl`, `docker logs`, `kubectl logs`, `ps -ef`, `head/tail -n <big>`, `npm ls`, `git log`, `history`). All deny/ask events are logged as parseable single-line records in `~/.config/ctx/hooks.log`.
-- **PostToolUse** on Bash: every `git commit` triggers a snapshot (`trigger: commit` in frontmatter).
+- **PreToolUse** on Bash (21 rules as of v0.7): denies 4 unambiguously heavy patterns (`find /`, `grep -r`, `cat /var/log/`, `du -a`) with a reason pointing at the matching `ctx_shell` / `ctx_read` / `ctx_grep` wrapper; asks for 17 others (`ls -R`, `tree`, `journalctl`, `docker logs`, `kubectl logs`, `ps -ef`, `head/tail -n <big>`, `npm ls`, `git log`, `history`, plus v0.7 additions: `rg -r`, `grep -R`, `egrep -r`, `awk/sed` over files, `wc -l` on globs, `find` without `-maxdepth`). All deny/ask events are logged as parseable single-line records in `~/.config/ctx/hooks.log`.
+- **PostToolUse** on every tool call (v0.7): structured event per tool invocation — `session_id`, `tool_name`, `cmd_head`, `size_bytes`, `exit` — so `ctx metrics` can correlate pre_tool decisions with what Claude actually ran. Also: `git commit` still triggers a snapshot (`trigger: commit` in frontmatter).
 - **UserPromptSubmit** on the first 1–2 prompts of a session: runs ranked search across past snapshots and injects the best match as `additionalContext`. Claude "remembers" how you solved X last time.
 
 **MCP server (Claude-initiated).** ctx exposes 9 tools Claude can call during a conversation:
@@ -97,6 +97,14 @@ Version 0.4.0 renames the plugin identifier from `ctx` to `claude-code-ctx` so i
 /plugin install claude-code-ctx@claude-code-ctx
 ```
 
+### Migrating from 0.6.0 → 0.7.x
+
+No breaking config change. Three wrinkles to know:
+
+1. **Plugin matcher removed** from `PostToolUse` in `plugin.json`. v0.6 only captured Bash post-tool events; v0.7 captures every tool (Read, Grep, Glob, MCP, TodoWrite, …) so `ctx metrics` can see what Claude actually ran after each redirect. If you forked `plugin.json`, drop the `"matcher": "Bash"` line under `PostToolUse`.
+2. **Log schema extended** with `session=<id>` on `pre_tool` and new `post_tool` / `cache-*` event types. Old pre-v0.7 log entries remain readable — `metrics.aggregate()` silently ignores `session-start`, `stop`, `pre-compact`, `pre-tool-use`, `post-tool-use`, `auto-retrieve`, and `hook` events instead of counting them as malformed.
+3. **Customized rules in user config don't auto-merge.** Arrays in `~/.config/ctx/config.json` replace defaults — they don't concatenate. If you've locally customized `hooks.pre_tool_use.rules`, copy the 6 v0.7 additions from `config.default.json` manually.
+
 Slash commands (`/ctx-ask`, `/ctx-doctor`, …) and the CLI binary (`ctx`) are unchanged.
 
 ---
@@ -125,6 +133,15 @@ Slash commands (`/ctx-ask`, `/ctx-doctor`, …) and the CLI binary (`ctx`) are u
 | `/ctx-config` | show config paths |
 | `/ctx-diff <a.md> <b.md>` | snapshot delta |
 | `/ctx-file <path>` | analyze a specific JSONL |
+| `/ctx-metrics` | **v0.7** — obey rate for pre_tool redirects, top bypass offenders, cache hit rate |
+| `/ctx-plugin-fix` | **v0.7** — recover plugin cache after Claude Code `/plugin update` wipes it |
+| `/ctx-version` | print installed ctx version |
+| `/ctx-setup` | one-shot: install hooks + ensure config |
+| `/ctx-install-hooks` | install just the hooks (idempotent) |
+| `/ctx-uninstall-hooks` | remove ctx hooks; keep foreign hooks |
+| `/ctx-daemon <start\|stop\|status\|log>` | background watcher for non-Claude-Code sessions |
+| `/ctx-watch` | live token % monitor (blocks until Ctrl-C) |
+| `/ctx-statusline` | preview one-line status for Claude Code statusline hook |
 
 ---
 
@@ -186,6 +203,47 @@ Sample output:
 No flags in v0.7; default window is the last 7 days. Correlation needs `session_id` from Claude Code's hook payload — events without session_id are reported under a separate counter.
 
 **Customized rules caveat:** if you've replaced the default `hooks.pre_tool_use.rules` array in your user config, the v0.7 additions (rg, grep -R, egrep, awk/sed, wc -l, find without -maxdepth) will NOT be merged automatically — arrays replace, not concatenate. Copy the new patterns from `config.default.json` manually.
+
+### What the metrics actually measure
+
+- **obey rate** = % of `deny` events where Claude switched to a `ctx_*` MCP tool within 60 seconds. High obey rate = the redirect culture is working. Low = either the reason message isn't landing or Claude is confident the command is fine.
+- **bypass rate** = % of `deny` events where Claude ran the same Bash command anyway (exit=0). Each pattern's bypass rate is shown separately so you can see which rules Claude routinely ignores.
+- **abandoned** = no follow-up tool call within 60s. Claude gave up on the intent, moved on, or asked the user.
+- **cache hit rate** = `ctx_cache_get` hits / total reads. High rate means Claude is re-using summarized output instead of re-running heavy commands.
+
+### Why this exists — expected savings
+
+A single `grep -r` on a large codebase can emit 50–200 KB (12–50K tokens). `ctx_grep` caps the inline return at 5 KB (~1.2K tokens) plus a cache ref for the full content. **Per redirected call that's ~10–48K tokens saved.**
+
+Cumulatively:
+- **Typical session** (0–3 redirect-eligible commands): 0–15% context savings.
+- **Heavy search session** (5–10 redirects): 15–40% savings.
+- **Disaster avoided** (one `find /` that would've filled your context to 75%): a one-shot %30–50 window saved and no forced `/clear`.
+
+The biggest wins are "context explosion prevented" moments — not measurable in percentages, measurable in sessions-not-abandoned. `ctx metrics` shows whether the redirect culture is actually sticking; tune the rules with data, not guesses.
+
+### `ctx plugin-fix` — recovery for a Claude Code plugin-manager bug
+
+Observed repeatedly: `/plugin update` or `autoUpdate` wipes `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>` but doesn't regenerate it. Every hook then emits `Plugin directory does not exist`. The marketplace checkout at `~/.claude/plugins/marketplaces/<marketplace>/` is still fine.
+
+```bash
+ctx plugin-fix      # terminal
+# or
+/ctx-plugin-fix     # slash (only works if the slash commands are already loaded)
+```
+
+The subcommand reads `installed_plugins.json`, finds ctx install paths that don't resolve, and restores them by `cp -R` from the stable marketplace checkout. Idempotent: "nothing to fix" when everything resolves. Tracked as an upstream bug; workaround until Anthropic patches it.
+
+### Cache GC
+
+`ctx_shell` / `ctx_read` / `ctx_grep` store full output in `~/.config/ctx/mcp-cache/` so Claude can paginate without re-running. v0.7 adds a GC layer:
+
+- **TTL** 24h by default (`config.cache.gc.ttl_hours`)
+- **max_bytes** 100 MB default (`config.cache.gc.max_bytes`), oldest-by-mtime evicted (LRU) when over
+- **Probabilistic sweep**: `writeCache` triggers `sweep()` with 5% probability per write (`config.cache.gc.sweep_probability`). No separate daemon, no cron.
+- Every `cache-write` / `cache-read result=<hit|miss>` / `cache-gc swept=N bytes_freed=M` event lands in `hooks.log` — `ctx metrics` rolls them up.
+
+Disable GC with `config.cache.gc.enabled: false`.
 
 ---
 
