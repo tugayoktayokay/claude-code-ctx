@@ -252,6 +252,7 @@ module.exports = {
   printTimeline,
   printDiff,
   printStats,
+  printMetrics,
   printBloat,
   printUsage,
   printHeavy,
@@ -259,6 +260,58 @@ module.exports = {
   timeAgo,
   macNotify,
 };
+
+function printMetrics(r) {
+  const pct = (n, d) => d ? Math.round(100 * n / d) : 0;
+  console.log('');
+  console.log(C.bold + `  ctx metrics — last ${r.range_days} days` + C.reset);
+  console.log('');
+  if ((r.pre_tool?.total || 0) === 0 && (r.cache?.writes || 0) === 0 && (r.cache?.reads || 0) === 0) {
+    console.log('  no events recorded yet');
+    console.log('');
+    if (r.parse_errors) console.log(C.dim + `  (${r.parse_errors} malformed log lines skipped)` + C.reset);
+    return;
+  }
+  console.log(`  pre_tool events: ${C.green}${r.pre_tool.total}${C.reset}`);
+  console.log('');
+  console.log(C.dim + '  deny:' + C.reset);
+  const d = r.pre_tool.deny;
+  console.log(`    total:        ${d.total}`);
+  console.log(`    obeyed:       ${d.obeyed} (${pct(d.obeyed, d.total)}%)`);
+  console.log(`    bypassed:     ${d.bypassed} (${pct(d.bypassed, d.total)}%)`);
+  console.log(`    abandoned:    ${d.abandoned} (${pct(d.abandoned, d.total)}%)`);
+  if (d.bypass_failed) console.log(`    bypass_failed: ${d.bypass_failed} (excluded from denominator)`);
+  console.log('');
+  console.log(C.dim + '  ask:' + C.reset);
+  const a = r.pre_tool.ask;
+  console.log(`    total:        ${a.total}`);
+  console.log(`    approved:     ${a.user_approved} (${pct(a.user_approved, a.total)}%)`);
+  console.log(`    redirected:   ${a.redirected} (${pct(a.redirected, a.total)}%)`);
+  console.log(`    canceled:     ${a.canceled} (${pct(a.canceled, a.total)}%)`);
+  if (a.approved_failed) console.log(`    approved_failed: ${a.approved_failed}`);
+  console.log('');
+  if (r.per_rule && r.per_rule.length) {
+    console.log(C.dim + '  top bypassed rules (needs attention):' + C.reset);
+    for (const rule of r.per_rule.slice(0, 5)) {
+      if (!rule.bypasses) continue;
+      const pctStr = Math.round(100 * rule.bypass_rate).toString().padStart(3) + '%';
+      console.log(`    ${rule.pattern.padEnd(32)} ${rule.bypasses} bypasses / ${rule.triggers} triggers  (${pctStr})`);
+    }
+    console.log('');
+  }
+  if (r.cache && (r.cache.writes || r.cache.reads || r.cache.gc_sweeps)) {
+    console.log(C.dim + `  cache (last ${r.range_days}d):` + C.reset);
+    console.log(`    writes:   ${r.cache.writes}`);
+    console.log(`    reads:    ${r.cache.reads} (${r.cache.read_hits} hits, ${r.cache.read_misses} misses — ${Math.round(100 * r.cache.hit_rate)}% hit rate)`);
+    if (r.cache.gc_sweeps) {
+      const mb = Math.round(r.cache.gc_bytes_freed / 1024 / 1024);
+      console.log(`    gc sweeps: ${r.cache.gc_sweeps} (evicted ${r.cache.gc_evicted} files, ${mb}MB freed)`);
+    }
+    console.log('');
+  }
+  if (r.unscoped) console.log(C.dim + `  (${r.unscoped} events without session_id — correlation skipped)` + C.reset);
+  if (r.parse_errors) console.log(C.dim + `  (${r.parse_errors} malformed log lines skipped)` + C.reset);
+}
 
 function printDoctor(results) {
   console.log('');
