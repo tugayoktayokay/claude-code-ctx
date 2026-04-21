@@ -148,7 +148,44 @@ ctx restore --list           # list JSONL backups
 ctx prune [--apply]          # memory dir cleanup
 ctx doctor                   # 9 health checks
 ctx status                   # install + config state
+ctx metrics                  # pre_tool redirect compliance + cache stats
 ```
+
+---
+
+## `ctx metrics`
+
+Reports whether Claude actually follows the `pre_tool_use` redirects you've configured. Reads `~/.config/ctx/hooks.log`, correlates each `deny`/`ask` event against the next tool call in the same session (within 60 seconds), and classifies the outcome.
+
+```
+ctx metrics
+```
+
+Sample output:
+
+```
+  ctx metrics — last 7 days
+
+  pre_tool events: 160
+
+  deny:
+    total:        42
+    obeyed:       31 (74%)
+    bypassed:      8 (19%)
+    abandoned:     3 ( 7%)
+
+  top bypassed rules (needs attention):
+    ^grep -r                         5 bypasses / 12 triggers  ( 42%)
+
+  cache (last 7d):
+    writes:   67
+    reads:    41 (25 hits, 16 misses — 61% hit rate)
+    gc sweeps: 4 (evicted 23 files, 78MB freed)
+```
+
+No flags in v0.7; default window is the last 7 days. Correlation needs `session_id` from Claude Code's hook payload — events without session_id are reported under a separate counter.
+
+**Customized rules caveat:** if you've replaced the default `hooks.pre_tool_use.rules` array in your user config, the v0.7 additions (rg, grep -R, egrep, awk/sed, wc -l, find without -maxdepth) will NOT be merged automatically — arrays replace, not concatenate. Copy the new patterns from `config.default.json` manually.
 
 ---
 
