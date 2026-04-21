@@ -952,6 +952,11 @@ function main(argv) {
     case 'help':
       printHelp();
       return 0;
+    case '--version':
+    case '-v':
+    case 'version':
+      console.log(require('../package.json').version);
+      return 0;
     default:
       if (cmd && !cmd.startsWith('-') && fs.existsSync(path.resolve(cmd))) {
         return runAnalyzeCmd([cmd], config);
