@@ -63,6 +63,7 @@ Analysis + memory:
   ctx usage [--tools|--skills] [--days 30]
                                      Aggregate tool/skill usage across sessions
   ctx heavy [jsonl-path]             Largest tool outputs in current session
+  ctx metrics                        Last 7d obey rate, bypass offenders, cache hit rate
   ctx statusline                     One-line status for Claude Code statusline hook
   ctx report [--out PATH] [--days N] Generate self-contained HTML report
   ctx doctor                         Runtime health check (hooks, config, daemon, binary path)
@@ -679,6 +680,29 @@ function runStats(args, config) {
   return 0;
 }
 
+function runMetrics(_args, _config) {
+  stripColor();
+  const os = require('os');
+  const metrics = require('./metrics.js');
+  const { printMetrics } = require('./output.js');
+  const logPath = path.join(os.homedir(), '.config', 'ctx', 'hooks.log');
+  if (!fs.existsSync(logPath)) {
+    console.log('');
+    console.log('  no hooks.log found at ' + logPath);
+    console.log('  (have you run `ctx setup` and invoked any tools yet?)');
+    console.log('');
+    return 0;
+  }
+  try {
+    const record = metrics.aggregate(logPath, { now: Date.now(), rangeDays: 7 });
+    printMetrics(record);
+    return 0;
+  } catch (err) {
+    console.error(`❌ ctx metrics failed: ${err.message}`);
+    return 1;
+  }
+}
+
 function runDiff(args, config) {
   stripColor();
   if (args.length < 2) {
@@ -895,6 +919,8 @@ function main(argv) {
       return runDiff(rest, config);
     case 'stats':
       return runStats(rest, config);
+    case 'metrics':
+      return runMetrics(rest, config);
     case 'bloat':
       return runBloat(rest, config);
     case 'usage':
