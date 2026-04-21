@@ -397,8 +397,8 @@ test('pre-tool-use writes structured single-line log entry', () => {
     const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
     const log = fs.readFileSync(logPath, 'utf8').trim().split('\n').pop();
 
-    // Structured format: <ISO8601> pre_tool action=X tool=Y pattern="..." cmd_head="..." reason="..."
-    assert.match(log, /^\S+Z pre_tool action=deny tool=Bash pattern=".+" cmd_head=".+" reason=".+"$/,
+    // Structured format: <ISO8601> pre_tool session=X action=X tool=Y pattern="..." cmd_head="..." reason="..."
+    assert.match(log, /^\S+Z pre_tool session=\S+ action=deny tool=Bash pattern=".+" cmd_head=".+" reason=".+"$/,
       `log line did not match format: ${log}`);
     assert.ok(log.includes('cmd_head="find / -name testfile"'), `cmd_head missing: ${log}`);
     assert.ok(log.includes('reason="use ctx_shell"'), `reason missing: ${log}`);
@@ -432,6 +432,128 @@ test('pre-tool-use log escapes embedded double quotes and newlines in cmd_head',
       `expected escaped quotes + newline→space in cmd_head: ${log}`);
   } finally {
     process.env.HOME = origHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('pre_tool log line includes session=<id> when provided', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = {
+      hooks: {
+        pre_tool_use: {
+          enabled: true,
+          default_mode: 'ask',
+          rules: [{ tool: 'Bash', match: '^grep -r', reason: 'test' }],
+        },
+      },
+    };
+    await hooks.handlePreToolUse(
+      { session_id: 'abc123', tool_name: 'Bash', tool_input: { command: 'grep -r foo .' } },
+      config,
+    );
+    const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
+    const content = fs.readFileSync(logPath, 'utf8');
+    assert.match(content, /pre_tool session=abc123 action=ask tool=Bash/);
+  } finally {
+    process.env.HOME = prevHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('pre_tool log line writes session=- when session_id missing', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = {
+      hooks: {
+        pre_tool_use: {
+          enabled: true,
+          default_mode: 'ask',
+          rules: [{ tool: 'Bash', match: '^grep -r', reason: 'test' }],
+        },
+      },
+    };
+    await hooks.handlePreToolUse(
+      { tool_name: 'Bash', tool_input: { command: 'grep -r foo .' } },
+      config,
+    );
+    const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
+    assert.match(content, /pre_tool session=- action=ask/);
+  } finally {
+    process.env.HOME = prevHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('post_tool logs size_bytes from tool_response.content string', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = { hooks: { post_tool_use: { triggers: [] } } };
+    await hooks.handlePostToolUse(
+      {
+        session_id: 'xyz',
+        tool_name: 'Bash',
+        tool_input: { command: 'grep -r foo' },
+        tool_response: { content: 'a'.repeat(5000), exit_code: 0 },
+      },
+      config,
+    );
+    const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
+    assert.match(content, /post_tool session=xyz tool=Bash cmd_head="grep -r foo" exit=0 size_bytes=5000/);
+  } finally {
+    process.env.HOME = prevHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('post_tool logs non-Bash tool with args_head', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = { hooks: { post_tool_use: { triggers: [] } } };
+    await hooks.handlePostToolUse(
+      {
+        session_id: 'xyz',
+        tool_name: 'Read',
+        tool_input: { file_path: '/tmp/x.txt' },
+        tool_response: { content: 'hi' },
+      },
+      config,
+    );
+    const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
+    assert.match(content, /post_tool session=xyz tool=Read cmd_head=".*x\.txt.*" exit=0 size_bytes=2/);
+  } finally {
+    process.env.HOME = prevHome;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+});
+
+test('post_tool defaults size_bytes=0 when tool_response missing', async () => {
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-'));
+  const prevHome = process.env.HOME;
+  process.env.HOME = tmpHome;
+  try {
+    const hooks = require('../hooks.js');
+    const config = { hooks: { post_tool_use: { triggers: [] } } };
+    await hooks.handlePostToolUse(
+      { session_id: 's', tool_name: 'Bash', tool_input: { command: 'echo hi' } },
+      config,
+    );
+    const content = fs.readFileSync(path.join(tmpHome, '.config', 'ctx', 'hooks.log'), 'utf8');
+    assert.match(content, /post_tool session=s tool=Bash cmd_head="echo hi" exit=0 size_bytes=0/);
+  } finally {
+    process.env.HOME = prevHome;
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });

@@ -188,10 +188,11 @@ function handlePreToolUse(input, config) {
     const action = mode === 'deny' ? 'deny' : mode === 'allow' ? 'allow' : 'ask';
     const reason = rule.reason || 'ctx: likely to produce heavy output — consider narrower scope';
 
+    const sessionId = String(input.session_id || '-').replace(/\s+/g, '_');
     const cmdHead = String(cmd).slice(0, 40).replace(/"/g, '\\"').replace(/\n/g, ' ');
     const patternEsc = String(rule.match).replace(/"/g, '\\"');
     const reasonEsc  = String(reason).replace(/"/g, '\\"').replace(/\n/g, ' ');
-    logHook(config, `pre_tool action=${action} tool=${toolName} pattern="${patternEsc}" cmd_head="${cmdHead}" reason="${reasonEsc}"`);
+    logHook(config, `pre_tool session=${sessionId} action=${action} tool=${toolName} pattern="${patternEsc}" cmd_head="${cmdHead}" reason="${reasonEsc}"`);
 
     return {
       output: {
@@ -208,6 +209,26 @@ function handlePreToolUse(input, config) {
 }
 
 async function handlePostToolUse(input, config) {
+  // --- v0.7 structured metric event (always log, regardless of triggers) ---
+  try {
+    const toolName = String(input.tool_name || '-');
+    const ti = input.tool_input || {};
+    const tr = input.tool_response;
+    const rawHead = toolName === 'Bash'
+      ? String(ti.command || '')
+      : JSON.stringify(ti);
+    const cmdHead = rawHead.slice(0, 80).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    let sizeBytes = 0;
+    if (tr && typeof tr === 'object') {
+      if (typeof tr.content === 'string') sizeBytes = tr.content.length;
+      else sizeBytes = JSON.stringify(tr).length;
+    }
+    const exit = (tr && typeof tr.exit_code === 'number') ? tr.exit_code : 0;
+    const sessionId = String(input.session_id || '-').replace(/\s+/g, '_');
+    logHook(config, `post_tool session=${sessionId} tool=${toolName} cmd_head="${cmdHead}" exit=${exit} size_bytes=${sizeBytes}`);
+  } catch {}
+  // --- end v0.7 metric event ---
+
   const triggers = config?.hooks?.post_tool_use?.triggers || [];
   if (!triggers.length) return { output: null, exitCode: 0 };
 
