@@ -1,6 +1,6 @@
 {
   "name": "claude-code-ctx",
-  "version": "0.4.0",
+  "version": "0.7.0",
   "description": "Claude Code context manager — token monitoring, auto-snapshot + JSONL backup on /clear, tailored /compact prompt, personal dev memory engine with BM25 search, system-prompt bloat audit. Zero runtime deps, no LLM calls.",
   "author": {
     "name": "Tugay Oktay Okay"
@@ -65,7 +65,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
