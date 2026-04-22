@@ -8,8 +8,17 @@ function makeDecision(analysis, limits, config) {
   const absoluteMax = limits.max || ceiling;
   const ctx = analysis.contextTokens;
 
+  const editPressureKB = analysis.editPressureKB || 0;
+  const pressureCfg = config?.limits?.edit_pressure || {};
+  const pressureEnabled = pressureCfg.enabled !== false;
+  const pressureThresh  = pressureCfg.threshold_kb ?? 100;
+  const pressureBump    = (pressureCfg.bump_pct ?? 15) / 100;
+  const pressureActive  = pressureEnabled && editPressureKB > pressureThresh;
+
   const pctCeiling = ctx / ceiling;
   const pctMax     = ctx / absoluteMax;
+
+  const effectivePct = pctCeiling + (pressureActive ? pressureBump : 0);
 
   const order = [
     ['critical',    thresholds.critical    ?? 0.90],
@@ -21,7 +30,7 @@ function makeDecision(analysis, limits, config) {
 
   let level = 'ok';
   for (const [name, threshold] of order) {
-    if (pctCeiling >= threshold) { level = name; break; }
+    if (effectivePct >= threshold) { level = name; break; }
   }
   if (level === 'ok') level = 'comfortable';
 
@@ -67,10 +76,17 @@ function makeDecision(analysis, limits, config) {
     }
   }
 
+  if (pressureActive) {
+    reasons.push(
+      `Recent Edit diffs: ~${editPressureKB}KB in last ${pressureCfg.window_turns ?? 3} turns — compact level advanced`
+    );
+  }
+
   return {
     level,
     action,
     reasons,
+    reason: { editPressure: pressureActive },
     metrics: {
       contextTokens: ctx,
       contextPct: Math.round(pctCeiling * 100),
@@ -82,6 +98,7 @@ function makeDecision(analysis, limits, config) {
       toolUses: analysis.toolUses,
       filesModified: analysis.filesModified.size,
       avgGrowthPerTurn: analysis.avgGrowthPerTurn,
+      editPressureKB,
     },
   };
 }
