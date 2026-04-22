@@ -517,8 +517,17 @@ function runUpgrade(args, config) {
   stripColor();
   const { execFileSync } = require('child_process');
   const repoDir = path.resolve(__dirname, '..');
+  const readVersion = () => {
+    try { return require(path.join(repoDir, 'package.json')).version; } catch { return 'unknown'; }
+  };
+  const describe = () => {
+    try { return execFileSync('git', ['-C', repoDir, 'describe', '--always', '--dirty'], { stdio: 'pipe' }).toString().trim(); }
+    catch { return 'unknown'; }
+  };
+  const before = { version: readVersion(), rev: describe() };
   console.log('');
   console.log(C.bold + `  ctx upgrade — pulling latest in ${repoDir}` + C.reset);
+  console.log(C.dim + `  before: ${before.version}  (${before.rev})` + C.reset);
   console.log('');
   try {
     const out = execFileSync('git', ['-C', repoDir, 'pull', '--ff-only'], { stdio: 'pipe' }).toString();
@@ -527,8 +536,16 @@ function runUpgrade(args, config) {
     console.error(C.red + `  ✗ git pull failed: ${err.message.split('\n')[0]}` + C.reset);
     return 1;
   }
+  delete require.cache[require.resolve(path.join(repoDir, 'package.json'))];
+  const after = { version: readVersion(), rev: describe() };
+  const changed = before.rev !== after.rev || before.version !== after.version;
   console.log('');
-  console.log(C.green + '  ✓ ctx source updated. Hook commands pointing to this checkout will pick it up on next invocation.' + C.reset);
+  console.log(C.dim + `  after:  ${after.version}  (${after.rev})` + C.reset);
+  if (changed) {
+    console.log(C.green + '  ✓ ctx source updated. Hooks pointing to this checkout pick it up on next invocation.' + C.reset);
+  } else {
+    console.log(C.dim + '  no change — already at latest on origin.' + C.reset);
+  }
   console.log(C.dim + '  If you use npm-installed version instead, run:  npm install -g claude-code-ctx@latest' + C.reset);
   console.log('');
   return 0;
