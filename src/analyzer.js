@@ -65,6 +65,8 @@ function analyzeEntries(entries, config) {
 
     toolCounts: {},
     largeOutputs: [],
+    recentEditSizes: [],
+    editPressureKB: 0,
 
     lastUserMessage: '',
     lastAssistantPreview: '',
@@ -73,6 +75,7 @@ function analyzeEntries(entries, config) {
   };
 
   let turn = 0;
+  let assistantTurn = 0;
   let prevInput = 0;
   const toolUseById = new Map();
 
@@ -113,6 +116,7 @@ function analyzeEntries(entries, config) {
 
     if (entry.type === 'assistant') {
       analysis.assistantMessages++;
+      assistantTurn++;
       const text = extractText(entry.message?.content);
       analysis.lastAssistantPreview = text.slice(0, 120);
       if (text.length > 20) {
@@ -134,7 +138,9 @@ function analyzeEntries(entries, config) {
         for (const block of msgContent) {
           if (block?.type === 'tool_use') {
             recordToolUse(analysis, block.name, block.input);
-            if (block.id) toolUseById.set(block.id, { name: block.name, input: block.input });
+            // aTurn = assistant turn that issued the tool_use (not when the result returned).
+            // Edit-pressure window is keyed by the turn the Edit was INVOKED in.
+            if (block.id) toolUseById.set(block.id, { name: block.name, input: block.input, aTurn: assistantTurn });
           }
         }
       }
@@ -142,7 +148,7 @@ function analyzeEntries(entries, config) {
 
     if (entry.type === 'tool_use') {
       recordToolUse(analysis, entry.tool || entry.name, entry.input);
-      if (entry.id) toolUseById.set(entry.id, { name: entry.tool || entry.name, input: entry.input });
+      if (entry.id) toolUseById.set(entry.id, { name: entry.tool || entry.name, input: entry.input, aTurn: assistantTurn });
     }
 
     if (entry.type === 'tool_result' || entry.type === 'user') {
@@ -153,11 +159,15 @@ function analyzeEntries(entries, config) {
             const out = typeof block.content === 'string'
               ? block.content
               : JSON.stringify(block.content || '');
+            // Edit-pressure: capture every Edit-like tool_result size, regardless of threshold
+            const editMap = block.tool_use_id ? toolUseById.get(block.tool_use_id) : null;
+            if (editMap && ['Edit','edit','MultiEdit','Write','write','str_replace_based_edit_tool'].includes(editMap.name)) {
+              analysis.recentEditSizes.push({ turn: editMap.aTurn ?? assistantTurn, size: out.length });
+            }
             if (out.length > 2000) {
-              const fromMap = block.tool_use_id ? toolUseById.get(block.tool_use_id) : null;
-              const toolName = fromMap?.name || 'tool_result';
+              const toolName = editMap?.name || 'tool_result';
               const preview = out.slice(0, 100);
-              const hint = heavyHintFor(toolName, fromMap?.input, out.length);
+              const hint = heavyHintFor(toolName, editMap?.input, out.length);
               analysis.largeOutputs.push({
                 tool: toolName,
                 size: out.length,
@@ -172,6 +182,14 @@ function analyzeEntries(entries, config) {
   }
 
   analysis.lastNMessages = analysis.userIntents.slice(-5);
+
+  // Edit-pressure: sum sizes from Edits that landed in the last window_turns assistant turns
+  const editWindow = config?.limits?.edit_pressure?.window_turns ?? 3;
+  const cutoff = assistantTurn - editWindow;
+  const pressureBytes = analysis.recentEditSizes
+    .filter(e => e.turn > cutoff)
+    .reduce((a, b) => a + b.size, 0);
+  analysis.editPressureKB = Math.round(pressureBytes / 1024);
 
   if (analysis.tokenPerTurn.length >= 3) {
     const recent = analysis.tokenPerTurn.slice(-Math.min(growthWindow, analysis.tokenPerTurn.length));

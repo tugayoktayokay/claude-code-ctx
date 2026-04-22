@@ -57,3 +57,53 @@ test('categories include schema and api for petition fixture', () => {
   assert.ok(keys.includes('api'),    `expected api in ${keys}`);
   assert.ok(keys.includes('schema'), `expected schema in ${keys}`);
 });
+
+test('editPressureKB is 0 when there are no Edit tool_results', () => {
+  const config = loadDefaults();
+  const entries = [
+    { type: 'assistant', message: { content: [
+      { type: 'tool_use', id: 'u1', name: 'Bash', input: { command: 'ls' } },
+    ] } },
+    { type: 'user', message: { content: [
+      { type: 'tool_result', tool_use_id: 'u1', content: 'file1\nfile2' },
+    ] } },
+  ];
+  const a = analyzeEntries(entries, config);
+  assert.equal(a.editPressureKB, 0);
+});
+
+test('editPressureKB sums Edit tool_result sizes within window_turns', () => {
+  const config = loadDefaults(); // window_turns=3
+  const edit = 'x'.repeat(40 * 1024);
+  const entries = [];
+  for (let i = 1; i <= 3; i++) {
+    entries.push({ type: 'user', message: { content: `turn ${i}` } });
+    entries.push({ type: 'assistant', message: { content: [
+      { type: 'tool_use', id: `e${i}`, name: 'Edit', input: { file_path: `/f${i}.ts` } },
+    ] } });
+    entries.push({ type: 'user', message: { content: [
+      { type: 'tool_result', tool_use_id: `e${i}`, content: edit },
+    ] } });
+  }
+  const a = analyzeEntries(entries, config);
+  assert.ok(a.editPressureKB >= 115 && a.editPressureKB <= 125,
+    `expected ~120KB, got ${a.editPressureKB}`);
+});
+
+test('editPressureKB excludes Edits outside window_turns', () => {
+  const config = loadDefaults(); // window_turns=3
+  const edit = 'x'.repeat(50 * 1024);
+  const entries = [];
+  for (let i = 1; i <= 5; i++) {
+    entries.push({ type: 'user', message: { content: `turn ${i}` } });
+    entries.push({ type: 'assistant', message: { content: [
+      { type: 'tool_use', id: `e${i}`, name: 'Edit', input: { file_path: `/f${i}.ts` } },
+    ] } });
+    entries.push({ type: 'user', message: { content: [
+      { type: 'tool_result', tool_use_id: `e${i}`, content: edit },
+    ] } });
+  }
+  const a = analyzeEntries(entries, config);
+  assert.ok(a.editPressureKB >= 145 && a.editPressureKB <= 155,
+    `expected ~150KB (last 3 only), got ${a.editPressureKB}`);
+});
