@@ -189,7 +189,7 @@ function handlePreToolUse(input, config) {
     const reason = rule.reason || 'ctx: likely to produce heavy output — consider narrower scope';
 
     const sessionId = String(input.session_id || '-').replace(/\s+/g, '_');
-    const cmdHead = String(cmd).slice(0, 40).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    const cmdHead = String(cmd).slice(0, 256).replace(/"/g, '\\"').replace(/\n/g, ' ');
     const patternEsc = String(rule.match).replace(/"/g, '\\"');
     const reasonEsc  = String(reason).replace(/"/g, '\\"').replace(/\n/g, ' ');
     logHook(config, `pre_tool session=${sessionId} action=${action} tool=${toolName} pattern="${patternEsc}" cmd_head="${cmdHead}" reason="${reasonEsc}"`);
@@ -217,7 +217,7 @@ async function handlePostToolUse(input, config) {
     const rawHead = toolName === 'Bash'
       ? String(ti.command || '')
       : JSON.stringify(ti);
-    const cmdHead = rawHead.slice(0, 80).replace(/"/g, '\\"').replace(/\n/g, ' ');
+    const cmdHead = rawHead.slice(0, 256).replace(/"/g, '\\"').replace(/\n/g, ' ');
     // Real PostToolUse payload shapes observed from Claude Code (2026-04-21):
     //   Bash: tr = {stdout, stderr, interrupted, isImage, noOutputExpected}  — no content, no exit_code
     //   Other: tr varies; some have `content` (string), some are the raw result
