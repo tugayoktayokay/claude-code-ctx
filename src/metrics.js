@@ -119,8 +119,8 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
   }
 
   const result = {
-    deny:  { total: 0, obeyed: 0, bypassed: 0, bypass_failed: 0, abandoned: 0 },
-    ask:   { total: 0, user_approved: 0, redirected: 0, canceled: 0, approved_failed: 0 },
+    deny:  { total: 0, obeyed: 0, bypassed: 0, bypass_failed: 0, indeterminate: 0, abandoned: 0 },
+    ask:   { total: 0, user_approved: 0, redirected: 0, canceled: 0, approved_failed: 0, indeterminate: 0 },
     per_rule: new Map(),
     unscoped: 0,
   };
@@ -160,17 +160,19 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         // was bypassed.
         if (isBashPost && !bashMatchesPattern(pre.pattern, post.cmd_head)) continue;
         closed.add(j);
-        // exit='-' means unknown (Bash payload doesn't expose exit_code in real Claude
-        // Code PostToolUse — only `interrupted`). Treat unknown as success (bypassed),
-        // only non-zero numeric exit (e.g. 124 from interrupted=true) as failure.
+        // exit='-' means unknown — tool_response had neither stdout/stderr nor content
+        // (e.g. interrupted before producing output, non-standard payload). Classify
+        // separately as `indeterminate` so it doesn't inflate bypass/bypass_failed.
         const exitStr = String(post.exit ?? '-');
         const exitNum = Number(exitStr);
         const exitKnown = Number.isFinite(exitNum);
-        if (isBashPost && (!exitKnown || exitNum === 0)) {
+        if (isBashPost && exitKnown && exitNum === 0) {
           classification = pre.action === 'deny' ? 'bypassed' : 'user_approved';
           if (pre.action === 'deny') result.per_rule.get(patt).bypasses++;
         } else if (isBashPost && exitKnown && exitNum !== 0) {
           classification = pre.action === 'deny' ? 'bypass_failed' : 'approved_failed';
+        } else if (isBashPost && !exitKnown) {
+          classification = 'indeterminate';
         } else if (isCtxPost) {
           classification = pre.action === 'deny' ? 'obeyed' : 'redirected';
         }

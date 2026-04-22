@@ -280,7 +280,8 @@ function printMetrics(r) {
   console.log(`    obeyed:       ${d.obeyed} (${pct(d.obeyed, d.total)}%)`);
   console.log(`    bypassed:     ${d.bypassed} (${pct(d.bypassed, d.total)}%)`);
   console.log(`    abandoned:    ${d.abandoned} (${pct(d.abandoned, d.total)}%)`);
-  if (d.bypass_failed) console.log(`    bypass_failed: ${d.bypass_failed} (excluded from denominator)`);
+  if (d.bypass_failed)  console.log(`    bypass_failed: ${d.bypass_failed} (excluded from denominator)`);
+  if (d.indeterminate)  console.log(`    indeterminate: ${d.indeterminate} (Bash exit unknown — excluded)`);
   console.log('');
   console.log(C.dim + '  ask:' + C.reset);
   const a = r.pre_tool.ask;
@@ -289,6 +290,7 @@ function printMetrics(r) {
   console.log(`    redirected:   ${a.redirected} (${pct(a.redirected, a.total)}%)`);
   console.log(`    canceled:     ${a.canceled} (${pct(a.canceled, a.total)}%)`);
   if (a.approved_failed) console.log(`    approved_failed: ${a.approved_failed}`);
+  if (a.indeterminate)   console.log(`    indeterminate:   ${a.indeterminate} (Bash exit unknown)`);
   console.log('');
   if (r.per_rule && r.per_rule.length) {
     console.log(C.dim + '  top bypassed rules (needs attention):' + C.reset);

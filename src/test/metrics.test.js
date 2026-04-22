@@ -197,14 +197,29 @@ test('correlate: ctx_cache_get is bystander (NOT in the obey bucket)', () => {
   assert.equal(r.pre_tool.deny.abandoned, 1);
 });
 
-test('correlate: Bash post with exit="-" (unknown) matching pattern classified as bypassed, not bypass_failed', () => {
+test('correlate: Bash post with exit="-" (unknown) matching pattern → indeterminate, not bypassed', () => {
+  // exit="-" happens when tool_response had neither stdout/stderr nor content
+  // (e.g. interrupted before output). We can't tell if the command actually ran,
+  // so don't inflate the bypass counter.
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
     { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', cmd_head: 'x', exit: '-' },
   ];
   const r = correlate(records);
-  assert.equal(r.pre_tool.deny.bypassed, 1);
+  assert.equal(r.pre_tool.deny.bypassed, 0);
   assert.equal(r.pre_tool.deny.bypass_failed, 0);
+  assert.equal(r.pre_tool.deny.indeterminate, 1);
+  assert.equal(r.per_rule[0].bypasses, 0);
+});
+
+test('correlate: ask + Bash exit="-" matching pattern → indeterminate (not user_approved)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'ask', tool: 'Bash', pattern: '^ls' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', cmd_head: 'ls -R', exit: '-' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.ask.user_approved, 0);
+  assert.equal(r.pre_tool.ask.indeterminate, 1);
 });
 
 test('correlate: native Grep bystander then nothing → abandoned', () => {
