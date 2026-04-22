@@ -9,6 +9,7 @@ const {
 const { analyzeEntries }     = require('./analyzer.js');
 const { makeDecision, fmtK } = require('./decision.js');
 const { copyToClipboard }    = require('./strategy.js');
+const { composeStatuslineIcon } = require('./statusline_helper.js');
 const { detectModel, getLimits } = require('./models.js');
 const { runAnalyze }         = require('./pipeline.js');
 const {
@@ -569,7 +570,7 @@ function runStatusline(_args, config) {
   try { pipe = runAnalyze({ cwd, config }); } catch {}
   if (!pipe) { process.stdout.write(''); return 0; }
 
-  const icon = { comfortable: '✓', watch: '○', compact: '◐', urgent: '●', critical: '⚠' }[pipe.decision.level] || '·';
+  const icon = composeStatuslineIcon(pipe.decision.level, !!pipe.decision.reason?.editPressure);
   const pct  = pipe.decision.metrics.contextPct;
   const tok  = fmtK(pipe.decision.metrics.contextTokens);
 
