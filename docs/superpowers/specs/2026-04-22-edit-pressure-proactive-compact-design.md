@@ -68,7 +68,7 @@ The bump is monotonic: it only ever promotes a level, never demotes.
 }
 ```
 
-Lives under the existing `decision` section of `config.default.json`. Each field user-overridable via `~/.config/ctx/config.json`. `enabled: false` disables the entire mechanism → behavior identical to pre-0.7.6.
+Lives under the existing `limits` section of `config.default.json` (same neighborhood as `thresholds`, `quality_ceiling`, and other level-cutoff knobs — `decision.js` already reads from `config.limits.*`). Each field user-overridable via `~/.config/ctx/config.json`. `enabled: false` disables the entire mechanism → behavior identical to pre-0.7.6.
 
 ### Strategy / prompt content
 
@@ -124,7 +124,7 @@ hooks.js (Stop) ── existing: clipboard copy + snapshot + alert
 | `src/decision.js` | Read `editPressureKB`, apply virtual bump, set `reason.editPressure` flag | +25 |
 | `src/strategy.js` | Append `recent Edit diffs` to drop list when `reason.editPressure` | +15 |
 | `src/statusline.js` | Prepend `⚡` when pressure flag set | +5 |
-| `config.default.json` | Add `decision.edit_pressure` block | +6 |
+| `config.default.json` | Add `limits.edit_pressure` block | +6 |
 | `src/test/analyzer.test.js` | New suite: editPressureKB computation from fixture | +25 |
 | `src/test/decision.test.js` | New cases: same pct, different pressure → different level | +35 |
 | `src/test/strategy.test.js` | New case: pressure flag → drop-list contains `Edit diffs` | +15 |
@@ -169,7 +169,7 @@ Extend `src/test/fixtures/demo-session.jsonl` with a handful of Edit entries; ad
 | Bump promotes too aggressively, users spam /compact | Defaults conservative (100 KB / 3 turns / 15 pct); 7-day `ctx metrics` review post-release; tunable via config |
 | Legitimate locale refactors trigger every turn | `window_turns=3` decays fast; ⚡ clears after 3 non-Edit turns; intentional — large refactor sessions SHOULD compact sooner |
 | Edit size_bytes shape changes in Claude Code payload | Field is already consumed by post_tool hook metric in v0.7; same exposure surface. If Claude Code changes shape, both systems break together, not just this |
-| Config field conflicts with future features | Namespaced under `decision.edit_pressure.*` — isolated from other future keys |
+| Config field conflicts with future features | Namespaced under `limits.edit_pressure.*` — isolated from other future keys |
 
 ## Rollout
 
