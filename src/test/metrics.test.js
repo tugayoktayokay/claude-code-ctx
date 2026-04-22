@@ -121,10 +121,10 @@ test('correlate: deny + ctx_grep post within window → obeyed', () => {
   assert.equal(r.pre_tool.deny.bypassed, 0);
 });
 
-test('correlate: deny + Bash post exit=0 → bypassed, per_rule updated', () => {
+test('correlate: deny + Bash post exit=0 matching pattern → bypassed, per_rule updated', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^find' },
-    { evType: 'post_tool', ts: '2026-04-21T10:00:20.000Z', session: 'S', tool: 'Bash', exit: '0' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:20.000Z', session: 'S', tool: 'Bash', cmd_head: 'find /', exit: '0' },
   ];
   const r = correlate(records);
   assert.equal(r.pre_tool.deny.bypassed, 1);
@@ -133,15 +133,37 @@ test('correlate: deny + Bash post exit=0 → bypassed, per_rule updated', () => 
   assert.equal(r.per_rule[0].bypass_rate, 1);
 });
 
-test('correlate: deny + Bash post exit=1 → bypass_failed, not bypassed', () => {
+test('correlate: deny + Bash post exit=1 matching pattern → bypass_failed, not bypassed', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
-    { evType: 'post_tool', ts: '2026-04-21T10:00:15.000Z', session: 'S', tool: 'Bash', exit: '1' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:15.000Z', session: 'S', tool: 'Bash', cmd_head: 'x', exit: '1' },
   ];
   const r = correlate(records);
   assert.equal(r.pre_tool.deny.bypass_failed, 1);
   assert.equal(r.pre_tool.deny.bypassed, 0);
   assert.equal(r.per_rule[0].bypasses, 0);
+});
+
+test('correlate: deny + unrelated Bash within window → abandoned, not bypassed (regression)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^\\s*find\\s+[/~]', cmd_head: 'find /Users/me/apps/X' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:05.000Z', session: 'S', tool: 'Bash', cmd_head: 'grep -n "foo" src/file.ts', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.bypassed, 0);
+  assert.equal(r.pre_tool.deny.abandoned, 1);
+  assert.equal(r.per_rule[0].bypasses, 0);
+});
+
+test('correlate: deny + unrelated Bash then ctx_* → obeyed (unrelated Bash is bystander)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^\\s*find\\s+[/~]', cmd_head: 'find /Users/me' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:05.000Z', session: 'S', tool: 'Bash', cmd_head: 'grep -n foo file', exit: '0' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'mcp__ctx__ctx_shell', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 1);
+  assert.equal(r.pre_tool.deny.bypassed, 0);
 });
 
 test('correlate: native Read bystander does not close pre; next ctx post wins', () => {
@@ -175,10 +197,10 @@ test('correlate: ctx_cache_get is bystander (NOT in the obey bucket)', () => {
   assert.equal(r.pre_tool.deny.abandoned, 1);
 });
 
-test('correlate: Bash post with exit="-" (unknown) classified as bypassed, not bypass_failed', () => {
+test('correlate: Bash post with exit="-" (unknown) matching pattern classified as bypassed, not bypass_failed', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^x' },
-    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', exit: '-' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', cmd_head: 'x', exit: '-' },
   ];
   const r = correlate(records);
   assert.equal(r.pre_tool.deny.bypassed, 1);
@@ -205,19 +227,29 @@ test('correlate: two consecutive pre, one post → first obeyed, second abandone
   assert.equal(r.pre_tool.deny.abandoned, 1);
 });
 
-test('correlate: ask + Bash exit=0 → user_approved', () => {
+test('correlate: ask + Bash exit=0 matching pattern → user_approved', () => {
   const records = [
     { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'ask', tool: 'Bash', pattern: '^ls' },
-    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', exit: '0' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', cmd_head: 'ls -R .', exit: '0' },
   ];
   const r = correlate(records);
   assert.equal(r.pre_tool.ask.user_approved, 1);
 });
 
+test('correlate: ask + unrelated Bash → canceled (pattern match required)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'ask', tool: 'Bash', pattern: '^ls' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: 'S', tool: 'Bash', cmd_head: 'git status', exit: '0' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.ask.user_approved, 0);
+  assert.equal(r.pre_tool.ask.canceled, 1);
+});
+
 test('correlate: session=- events go to unscoped bucket, not correlated', () => {
   const records = [
-    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: '-', action: 'deny', tool: 'Bash', pattern: '^x' },
-    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: '-', tool: 'Bash', exit: '0' },
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: '-', action: 'deny', tool: 'Bash', pattern: '^x', cmd_head: 'x' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:10.000Z', session: '-', tool: 'Bash', cmd_head: 'x', exit: '0' },
   ];
   const r = correlate(records);
   assert.equal(r.unscoped, 2);

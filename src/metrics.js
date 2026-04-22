@@ -98,6 +98,18 @@ const WINDOW_SECONDS_DEFAULT = 60;
 
 function toMs(ts) { return Date.parse(ts); }
 
+// A Bash post_tool within the correlation window only counts against a pre_tool
+// if the Bash command actually matches the rule's pattern. Without this check,
+// any unrelated Bash command (scoped grep, git log, cat .env, etc.) fired
+// shortly after a deny was misclassified as a bypass — producing false-positive
+// bypass counts even when Claude had obeyed the rule.
+function bashMatchesPattern(pattern, cmdHead) {
+  if (!pattern) return false;
+  if (typeof cmdHead !== 'string' || cmdHead.length === 0) return false;
+  try { return new RegExp(pattern).test(cmdHead); }
+  catch { return false; }
+}
+
 function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
   const bySession = new Map();
   for (const r of records) {
@@ -142,6 +154,11 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         const isBashPost = post.tool === 'Bash';
         const isCtxPost  = CTX_MCP_TOOL_RE.test(post.tool || '');
         if (!isBashPost && !isCtxPost) continue; // bystander — skip
+        // Bash that doesn't match the rule's pattern is also a bystander: the
+        // user likely ran an unrelated command while Claude was about to obey
+        // via ctx_*. Only a Bash call matching the pattern proves the rule
+        // was bypassed.
+        if (isBashPost && !bashMatchesPattern(pre.pattern, post.cmd_head)) continue;
         closed.add(j);
         // exit='-' means unknown (Bash payload doesn't expose exit_code in real Claude
         // Code PostToolUse — only `interrupted`). Treat unknown as success (bypassed),
