@@ -63,6 +63,11 @@ function buildStrategy(analysis, decision, config) {
     );
   }
 
+  if (decision?.reason?.editPressure) {
+    strategy.drop.push('recent Edit diffs');
+    strategy.reasoning.push('Recent Edit operations dominate context — drop the raw diffs, keep the file-level summary');
+  }
+
   const repeatedPrefixes = new Map();
   for (const cmd of analysis.bashCommands) {
     const prefix = cmd.split(' ')[0];

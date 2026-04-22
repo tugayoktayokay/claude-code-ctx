@@ -24,3 +24,27 @@ test('strategy produces a /compact prompt with focus/keep/continue', () => {
   assert.ok(strategy.compactPrompt.includes('continue:'));
   assert.ok(strategy.keep.length > 0, 'keep sections populated');
 });
+
+test('compactPrompt includes "Edit diffs" when decision.reason.editPressure', () => {
+  const config   = loadDefaults();
+  const entries  = parseJSONL(FIXTURE);
+  const analysis = analyzeEntries(entries, config);
+  const limits   = { max: 200000, quality_ceiling: 200000 };
+  const decision = makeDecision(analysis, limits, config);
+  // Force pressure flag on for this test; analyzer/decision tested separately
+  decision.reason = { editPressure: true };
+  const strategy = buildStrategy(analysis, decision, config);
+  assert.match(strategy.compactPrompt, /Edit diffs/,
+    `prompt should mention Edit diffs under pressure: ${strategy.compactPrompt}`);
+});
+
+test('compactPrompt does NOT mention Edit diffs without pressure', () => {
+  const config   = loadDefaults();
+  const entries  = parseJSONL(FIXTURE);
+  const analysis = analyzeEntries(entries, config);
+  const limits   = { max: 200000, quality_ceiling: 200000 };
+  const decision = makeDecision(analysis, limits, config);
+  // Without setting decision.reason.editPressure (defaults false)
+  const strategy = buildStrategy(analysis, decision, config);
+  assert.doesNotMatch(strategy.compactPrompt, /Edit diffs/);
+});
