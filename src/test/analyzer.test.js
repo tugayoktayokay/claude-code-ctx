@@ -107,3 +107,11 @@ test('editPressureKB excludes Edits outside window_turns', () => {
   assert.ok(a.editPressureKB >= 145 && a.editPressureKB <= 155,
     `expected ~150KB (last 3 only), got ${a.editPressureKB}`);
 });
+
+test('fixture with 40KB Edit produces editPressureKB === 40 (integration)', () => {
+  const config = loadDefaults();
+  const entries = parseJSONL(FIXTURE);
+  const analysis = analyzeEntries(entries, config);
+  // One Edit of exactly 40960 bytes → Math.round(40960/1024) = 40. Deterministic.
+  assert.equal(analysis.editPressureKB, 40);
+});
