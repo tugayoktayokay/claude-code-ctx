@@ -18,6 +18,12 @@
     "growth_window": 5,
     "growth_warn": 5000,
     "output_ratio_warn": 0.4,
+    "edit_pressure": {
+      "enabled": true,
+      "window_turns": 3,
+      "threshold_kb": 100,
+      "bump_pct": 15
+    },
     "max_entries": 20000
   },
   "watch": {
