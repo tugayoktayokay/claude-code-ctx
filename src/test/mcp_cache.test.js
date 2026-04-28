@@ -5,6 +5,19 @@ const assert = require('node:assert/strict');
 const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
+
+// File-level HOME isolation. mcp_cache.js sets CACHE_DIR from `os.homedir()` at
+// module load and writes both files + cache-write/read/gc events under HOME.
+// Without this, unwrapped tests below would pollute the user's real cache dir
+// and `~/.config/ctx/hooks.log`.
+const FILE_TMP_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-mcpcache-test-home-'));
+const ORIG_HOME = process.env.HOME;
+process.env.HOME = FILE_TMP_HOME;
+process.on('exit', () => {
+  process.env.HOME = ORIG_HOME;
+  try { fs.rmSync(FILE_TMP_HOME, { recursive: true, force: true }); } catch {}
+});
+
 const cache  = require('../mcp_cache.js');
 
 function withTmpHome(fn) {

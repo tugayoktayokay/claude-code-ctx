@@ -5,6 +5,18 @@ const assert = require('node:assert/strict');
 const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
+
+// File-level HOME isolation. mcp_cache.writeCache appends a `cache-write`
+// event to `~/.config/ctx/hooks.log` and creates files in `~/.config/ctx/mcp-cache/`.
+// Without this every test run would pollute the real log + cache dir.
+const FILE_TMP_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-mcptools-test-home-'));
+const ORIG_HOME = process.env.HOME;
+process.env.HOME = FILE_TMP_HOME;
+process.on('exit', () => {
+  process.env.HOME = ORIG_HOME;
+  try { fs.rmSync(FILE_TMP_HOME, { recursive: true, force: true }); } catch {}
+});
+
 const { allTools } = require('../mcp_tools.js');
 const { loadDefaults } = require('../config.js');
 

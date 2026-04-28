@@ -6,6 +6,17 @@ const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
 
+// File-level HOME isolation. logHook resolves `os.homedir()` at runtime, so
+// without this every hook handler call in this file would append to the real
+// `~/.config/ctx/hooks.log` with `session=-` and pollute `ctx metrics` output.
+const FILE_TMP_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hooks-test-home-'));
+const ORIG_HOME = process.env.HOME;
+process.env.HOME = FILE_TMP_HOME;
+process.on('exit', () => {
+  process.env.HOME = ORIG_HOME;
+  try { fs.rmSync(FILE_TMP_HOME, { recursive: true, force: true }); } catch {}
+});
+
 const {
   handleSessionStart,
   handleStop,
@@ -594,6 +605,33 @@ test('new Bash rules: rg/grep -R/egrep/awk/sed/wc/find coverage', () => {
       try { return new RegExp(r.match).test(cmd); } catch { return false; }
     });
     assert.equal(matched, expectMatch, `[${label}] "${cmd}" expected ${expectMatch ? 'match' : 'no-match'}`);
+  }
+});
+
+test('regression: hook handler calls without explicit HOME override do not pollute real log', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: true,
+    default_mode: 'deny',
+    rules: [{ tool: 'Bash', match: '^regression-marker', reason: 'isolation check' }],
+  };
+  handlePreToolUse(
+    { tool_name: 'Bash', tool_input: { command: 'regression-marker xyz' } },
+    cfg,
+  );
+
+  const tmpLog = path.join(FILE_TMP_HOME, '.config', 'ctx', 'hooks.log');
+  assert.ok(fs.existsSync(tmpLog), 'log written under FILE_TMP_HOME (file-level isolation works)');
+  const tmpContent = fs.readFileSync(tmpLog, 'utf8');
+  assert.match(tmpContent, /cmd_head="regression-marker xyz"/);
+
+  if (ORIG_HOME) {
+    const realLog = path.join(ORIG_HOME, '.config', 'ctx', 'hooks.log');
+    if (fs.existsSync(realLog)) {
+      const realContent = fs.readFileSync(realLog, 'utf8');
+      assert.equal(realContent.includes('regression-marker xyz'), false,
+        'regression marker must NOT leak into real ~/.config/ctx/hooks.log');
+    }
   }
 });
 
