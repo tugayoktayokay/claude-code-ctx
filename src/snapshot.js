@@ -270,7 +270,13 @@ function writeSnapshot(analysis, decision, strategy, options) {
     const recent = readRecentFingerprints(memoryDir, 1);
     return recent[0] ? recent[0].name : null;
   })();
-  const categoryKeys = [...analysis.activeCategories.keys()];
+  const minHits = config?.snapshot?.categories_min_hits ?? 1;
+  const ranked = [...analysis.activeCategories.entries()]
+    .sort((a, b) => b[1].count - a[1].count);
+  let categoryKeys = ranked.filter(([, v]) => v.count >= minHits).map(([k]) => k);
+  if (categoryKeys.length === 0 && ranked.length > 0) {
+    categoryKeys = [ranked[0][0]];
+  }
 
   const name = `ctx snapshot — ${derived.replace(/_/g, ' ')}`;
   const markdown = buildMarkdown(analysis, decision, strategy, {

@@ -247,6 +247,86 @@ test('writeSnapshot emits parent and categories in frontmatter', () => {
   }
 });
 
+test('writeSnapshot filters categories below min_hits threshold', () => {
+  const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-catmin-'));
+  const fakeCwd = '/tmp/ctx-catmin';
+  const config  = loadDefaults();
+  config.snapshot = {
+    memory_dir: path.join(tmpBase, 'memory'),
+    auto_index_update: false,
+    dedup_window_n: 0,
+    categories_min_hits: 2,
+  };
+
+  try {
+    const analysis = {
+      messageCount: 1, toolUses: 0,
+      filesModified: new Set(), bashCommands: [],
+      criticalBits: [], userIntents: ['hi'], decisions: [], failedAttempts: [],
+      lastNMessages: ['hi'],
+      largeOutputs: [], recentEditSizes: [], editPressureKB: 0,
+      activeCategories: new Map([
+        ['ai',     { count: 5, examples: [], label: 'AI integration' }],
+        ['bug',    { count: 3, examples: [], label: 'Bug fix' }],
+        ['stripe', { count: 1, examples: [], label: 'Payments' }],
+        ['mobile', { count: 1, examples: [], label: 'Mobile/UI' }],
+      ]),
+    };
+    const decision = { metrics: { contextPct: 10, contextTokens: 5000, qualityCeiling: 200000 } };
+    const strategy = { compactPrompt: '/compact x', keep: [] };
+
+    const result = writeSnapshot(analysis, decision, strategy, {
+      cwd: fakeCwd, config, sessionId: 'sid', modelId: 'claude-opus-4-7', trigger: 'manual',
+    });
+    const content = fs.readFileSync(result.outPath, 'utf8');
+    const m = content.match(/^categories: \[([^\]]+)\]$/m);
+    assert.ok(m, 'categories line present');
+    const cats = m[1].split(',').map(s => s.trim()).sort();
+    assert.deepEqual(cats, ['ai', 'bug'], `incidental cats should be filtered, got ${cats}`);
+  } finally {
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+  }
+});
+
+test('writeSnapshot keeps top category when all fall below min_hits (fallback)', () => {
+  const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-catfb-'));
+  const fakeCwd = '/tmp/ctx-catfb';
+  const config  = loadDefaults();
+  config.snapshot = {
+    memory_dir: path.join(tmpBase, 'memory'),
+    auto_index_update: false,
+    dedup_window_n: 0,
+    categories_min_hits: 5,
+  };
+
+  try {
+    const analysis = {
+      messageCount: 1, toolUses: 0,
+      filesModified: new Set(), bashCommands: [],
+      criticalBits: [], userIntents: ['hi'], decisions: [], failedAttempts: [],
+      lastNMessages: ['hi'],
+      largeOutputs: [], recentEditSizes: [], editPressureKB: 0,
+      activeCategories: new Map([
+        ['ai',  { count: 2, examples: [], label: 'AI integration' }],
+        ['bug', { count: 1, examples: [], label: 'Bug fix' }],
+      ]),
+    };
+    const decision = { metrics: { contextPct: 10, contextTokens: 5000, qualityCeiling: 200000 } };
+    const strategy = { compactPrompt: '/compact x', keep: [] };
+
+    const result = writeSnapshot(analysis, decision, strategy, {
+      cwd: fakeCwd, config, sessionId: 'sid', modelId: 'claude-opus-4-7', trigger: 'manual',
+    });
+    const content = fs.readFileSync(result.outPath, 'utf8');
+    const m = content.match(/^categories: \[([^\]]+)\]$/m);
+    assert.ok(m, 'categories line present even when all below threshold');
+    const cats = m[1].split(',').map(s => s.trim());
+    assert.deepEqual(cats, ['ai'], `should fallback to top category, got ${cats}`);
+  } finally {
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+  }
+});
+
 test('rewriteIndex removes only project_* lines in the removed set', () => {
   const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-idx-'));
   const idx = path.join(tmpBase, 'MEMORY.md');
