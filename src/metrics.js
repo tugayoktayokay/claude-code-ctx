@@ -250,7 +250,14 @@ function aggregate(logPath, { now = Date.now(), rangeDays = 7, windowSeconds = 6
 
 function aggregateMetrics(records) {
   const corr = correlate(records);
-  const wm = { dedup_hits: 0, bytes_saved: 0, recall_calls: 0, recall_rate: 0 };
+  const wm = {
+    dedup_hits: 0,
+    bytes_saved: 0,
+    recall_calls: 0,
+    recall_rate: 0,
+    bash_dedup_hits: 0,
+    bash_bytes_saved: 0,
+  };
   for (const r of records) {
     if (r.evType !== 'working_memory') continue;
     if (r.action === 'dedup_hit') {
@@ -259,6 +266,10 @@ function aggregateMetrics(records) {
       if (Number.isFinite(n)) wm.bytes_saved += n;
     } else if (r.action === 'recall_call') {
       wm.recall_calls++;
+    } else if (r.action === 'bash_dedup_hit') {
+      wm.bash_dedup_hits++;
+      const n = Number(r.bytes_saved);
+      if (Number.isFinite(n)) wm.bash_bytes_saved += n;
     }
   }
   wm.recall_rate = wm.dedup_hits ? wm.recall_calls / wm.dedup_hits : 0;

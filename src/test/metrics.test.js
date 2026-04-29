@@ -355,3 +355,19 @@ test('parseLog recognizes working_memory event types', () => {
   assert.equal(records[1].action, 'recall_call');
   assert.equal(records[1].hit, 'true');
 });
+
+test('aggregateMetrics surfaces working_memory bash_dedup counts', () => {
+  const { parseLogString, aggregateMetrics } = require('../metrics.js');
+  const lines = [
+    '2026-04-29T10:00:00.000Z working_memory action=dedup_hit session=s1 path="/a.md" prior_turn=3 bytes_saved=2000',
+    '2026-04-29T10:01:00.000Z working_memory action=bash_dedup_hit session=s1 cmd_norm="git status" prior_turn=4 bytes_saved=500 window_sec=30',
+    '2026-04-29T10:02:00.000Z working_memory action=bash_dedup_hit session=s1 cmd_norm="grep foo src/" prior_turn=5 bytes_saved=1500 window_sec=60',
+  ].join('\n');
+  const { records } = parseLogString(lines);
+  const agg = aggregateMetrics(records);
+  assert.ok(agg.working_memory);
+  assert.equal(agg.working_memory.dedup_hits, 1);
+  assert.equal(agg.working_memory.bytes_saved, 2000);
+  assert.equal(agg.working_memory.bash_dedup_hits, 2);
+  assert.equal(agg.working_memory.bash_bytes_saved, 2000);
+});
