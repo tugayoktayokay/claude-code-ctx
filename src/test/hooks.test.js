@@ -597,6 +597,25 @@ test('new Bash rules: rg/grep -R/egrep/awk/sed/wc/find coverage', () => {
     ['find . -name x -print',          true,  'find without -maxdepth'],
     ['find . -maxdepth 3 -name x -print', false, 'find with -maxdepth (first)'],
     ['find . -name x -maxdepth 3 -print', false, 'find with -maxdepth (middle)'],
+    // absolute-path find: deny only when truly unscoped — having -name/-maxdepth/-type f/-iname proves scope
+    ['find /',                                                       true,  'find / unscoped'],
+    ['find ~',                                                       true,  'find ~ unscoped'],
+    ['find /Users/foo/proj',                                         true,  'find absolute path unscoped'],
+    ['find /Users/foo/proj -name "*.go"',                            false, 'find absolute path with -name'],
+    ['find /Users/foo/proj -maxdepth 2 -name "CLAUDE.md"',           false, 'find absolute path with -maxdepth + -name'],
+    ['find /Users/foo/proj -type f -name "*.go" | sort',             false, 'find absolute path with -type f + -name'],
+    ['find ~/Documents -iname "readme*"',                            false, 'find ~ with -iname'],
+    ['find /Users/foo/proj -type f \\( -name "*.go" -o -name "*.html" \\) ! -path "*/.git/*"', false, 'heavily scoped find'],
+    ['find /Users/foo/proj \\\n  -name "*.go"',                      false, 'multiline find with -name on next line'],
+    // flag-first variants: find -L / (follow symlinks), -H, -P
+    ['find -L /',                                                    true,  'flag-first unscoped (-L)'],
+    ['find -H ~',                                                    true,  'flag-first unscoped (-H)'],
+    ['find -P /Users/foo',                                           true,  'flag-first unscoped (-P)'],
+    ['find -L / -name "*.so"',                                       false, 'flag-first scoped'],
+    ['find -L /Users/foo -maxdepth 3',                               false, 'flag-first with -maxdepth'],
+    // double-dash long-form scope flags (find rejects but Claude may try)
+    ['find / --maxdepth 3',                                          false, 'double-dash --maxdepth treated as scope intent'],
+    ['find /Users/foo --name "*.go"',                                false, 'double-dash --name treated as scope intent'],
   ];
 
   for (const [cmd, expectMatch, label] of testCases) {

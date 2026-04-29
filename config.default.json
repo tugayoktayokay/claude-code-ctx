@@ -102,7 +102,7 @@
       "enabled": true,
       "default_mode": "ask",
       "rules": [
-        { "tool": "Bash", "match": "^\\s*find\\s+[/~]",                  "mode": "deny", "reason": "Unbounded filesystem traversal from root/home. Use ctx_shell({command: \"find ...\"}) — full output cached, returns ~500B summary + ref. Or scope: find ./src -maxdepth 3 -name '*.js'." },
+        { "tool": "Bash", "match": "^\\s*find\\s+(?:-[LHP]\\s+)*[/~]\\S*(?![\\s\\S]*\\s--?(maxdepth|name|iname|type\\s+f)\\b)", "mode": "deny", "reason": "Unbounded filesystem traversal from root/home. Add -maxdepth N or -name PATTERN to scope, or use ctx_shell({command: \"find ...\"}) — full output cached, returns ~500B summary + ref." },
         { "tool": "Bash", "match": "^\\s*grep\\s+-r(\\s+|$)",              "mode": "deny", "reason": "Recursive grep floods context. Use ctx_grep({pattern, path}) — inline if small, summary+ref if big. Drop-in replacement." },
         { "tool": "Bash", "match": "^\\s*cat\\s+/var/log/",               "mode": "deny", "reason": "Log files are huge. Use ctx_read({path, limit_bytes: 5000}) for head/tail summary, or tail -n 200." },
         { "tool": "Bash", "match": "^\\s*du\\s+-a",                       "mode": "deny", "reason": "du -a lists every file. Use du -sh <path> for totals, or ctx_shell if you really need per-file." },
