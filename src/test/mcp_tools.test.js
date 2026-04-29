@@ -83,3 +83,46 @@ test('all tools have required schema fields', () => {
     assert.equal(typeof t.handler, 'function', `${t.name} handler`);
   }
 });
+
+test('ctx_recall_read returns cached content for previously recorded path', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-mcp-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+  // Bust require cache to ensure mcp_tools picks up env-aware path
+  delete require.cache[require.resolve('../working_memory.js')];
+  delete require.cache[require.resolve('../mcp_tools.js')];
+  const wm = require('../working_memory.js');
+
+  try {
+    const sid = 'sid-mcp-1';
+    const filePath = '/abs/CLAUDE.md';
+    const content = 'CLAUDE rules go here';
+    wm.recordRead(sid, filePath, content);
+
+    const { allTools: allTools2 } = require('../mcp_tools.js');
+    const tool = allTools2().find(t => t.name === 'ctx_recall_read');
+    assert.ok(tool, 'ctx_recall_read tool registered');
+
+    const res = await tool.handler({ path: filePath, session_id: sid }, { config: {} });
+    assert.match(res, /CLAUDE rules go here/);
+    assert.match(res, /turn=1/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('ctx_recall_read returns error for unknown path', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-mcp-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+  delete require.cache[require.resolve('../working_memory.js')];
+  delete require.cache[require.resolve('../mcp_tools.js')];
+  try {
+    const { allTools: allTools3 } = require('../mcp_tools.js');
+    const tool = allTools3().find(t => t.name === 'ctx_recall_read');
+    const res = await tool.handler({ path: '/nope.md', session_id: 'sid-x' }, { config: {} });
+    assert.match(res, /no working memory record/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});

@@ -146,6 +146,31 @@ const memoryTools = [
       return okText(lines.join('\n'));
     },
   },
+  {
+    name: 'ctx_recall_read',
+    description: 'Recall the contents of a file you previously Read in this session — returns cached content without re-reading from disk. Use after seeing a [ctx working_memory] dedup notice in a denied Read.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path:       { type: 'string', description: 'Absolute path of the previously-read file.' },
+        session_id: { type: 'string', description: 'Session id (the harness usually fills this; pass-through).' },
+      },
+      required: ['path'],
+    },
+    handler: async (args, { config: _config } = {}) => {
+      const wm = require('./working_memory.js');
+      const filePath = String(args.path || '');
+      const sid = String(args.session_id || process.env.CLAUDE_SESSION_ID || '-');
+      if (!filePath) return okText('error: missing path');
+      const last = wm.lookupLatestRead(sid, filePath);
+      if (!last) return okText(`error: no working memory record for ${filePath}`);
+      const blob = wm.readBlob(sid, last.hash);
+      if (blob == null) return okText(`error: blob missing for hash ${last.hash}`);
+      return okText(
+        `[ctx_recall_read ${filePath}, ${last.size}B, turn=${last.turn}, hash=${last.hash.slice(0, 22)}, recorded=${last.ts}]\n${blob}`,
+      );
+    },
+  },
 ];
 
 function parseByteLimit(v, fallback) {
