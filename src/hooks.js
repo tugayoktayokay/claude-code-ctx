@@ -285,6 +285,24 @@ async function handlePostToolUse(input, config) {
     }
     const sessionId = String(input.session_id || '-').replace(/\s+/g, '_');
     logHook(config, `post_tool session=${sessionId} tool=${toolName} cmd_head="${cmdHead}" exit=${exit} size_bytes=${sizeBytes}`);
+    // --- working memory: record Read content (Phase 1) ---
+    try {
+      const wmCfg = config?.working_memory;
+      if (wmCfg?.enabled && toolName === 'Read') {
+        const filePath = ti.file_path || '';
+        const tr2 = input.tool_response;
+        const body = (tr2 && typeof tr2.content === 'string') ? tr2.content : null;
+        const sidRec = String(input.session_id || '-');
+        if (filePath && body !== null && sidRec !== '-' && body.length >= (wmCfg.min_dedup_size_bytes ?? 1024)) {
+          const wm = require('./working_memory.js');
+          const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+          wm.recordRead(sidRec, filePath, body, { mtime: stat ? stat.mtimeMs : null });
+        }
+      }
+    } catch (err) {
+      logHook(config, `working_memory error in post_tool: ${err.message}`);
+    }
+    // --- end working memory record ---
   } catch {}
   // --- end v0.7 metric event ---
 

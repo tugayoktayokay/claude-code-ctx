@@ -732,3 +732,39 @@ test('PreToolUse Read: disabled flag bypasses dedup', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('PostToolUse Read records content in working memory', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-post-'));
+  const targetFile = path.join(tmp, 'README.md');
+  const content = 'r'.repeat(1500);
+  fs.writeFileSync(targetFile, content);
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+
+    const sid = 'sid-post-1';
+    await handlePostToolUse(
+      {
+        session_id: sid,
+        tool_name: 'Read',
+        tool_input: { file_path: targetFile },
+        tool_response: { content },
+      },
+      cfg,
+    );
+
+    const wm = require('../working_memory.js');
+    const last = wm.lookupLatestRead(sid, targetFile);
+    assert.ok(last);
+    assert.equal(last.size, 1500);
+    assert.equal(last.hash, wm.hashContent(content));
+
+    const blob = wm.readBlob(sid, last.hash);
+    assert.equal(blob, content);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
