@@ -663,7 +663,7 @@ test('PreToolUse Read: second identical Read triggers dedup deny + recall hint',
 
   try {
     const cfg = configWithDirs();
-    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_minutes: 10, ttl_hours: 24 };
 
     const sid = 'hook-sid-1';
     const wm = require('../working_memory.js');
@@ -693,7 +693,7 @@ test('PreToolUse Read: first Read passes through (no prior record)', () => {
 
   try {
     const cfg = configWithDirs();
-    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_minutes: 10, ttl_hours: 24 };
 
     const res = handlePreToolUse(
       { session_id: 'sid-fresh', tool_name: 'Read', tool_input: { file_path: targetFile } },
@@ -742,7 +742,7 @@ test('PostToolUse Read records content in working memory', async () => {
 
   try {
     const cfg = configWithDirs();
-    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_minutes: 10, ttl_hours: 24 };
 
     const sid = 'sid-post-1';
     await handlePostToolUse(
@@ -763,6 +763,45 @@ test('PostToolUse Read records content in working memory', async () => {
 
     const blob = wm.readBlob(sid, last.hash);
     assert.equal(blob, content);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Read: dedup does NOT fire when prior read is older than recency window', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-stale-'));
+  const targetFile = path.join(tmp, 'CLAUDE.md');
+  const content = 'a'.repeat(2000);
+  fs.writeFileSync(targetFile, content);
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_minutes: 10, ttl_hours: 24 };
+
+    const sid = 'sid-stale';
+    const wm = require('../working_memory.js');
+    // Record a read with a backdated ts (20 minutes ago)
+    const state = wm.loadSession(sid);
+    state.reads[targetFile] = [{
+      turn: 1,
+      hash: wm.hashContent(content),
+      size: content.length,
+      mtime: 'A',
+      ts: new Date(Date.now() - 20 * 60_000).toISOString(),
+    }];
+    state.next_turn = 2;
+    wm.saveSession(state);
+    wm.writeBlob(sid, wm.hashContent(content), content);
+
+    const res = handlePreToolUse(
+      { session_id: sid, tool_name: 'Read', tool_input: { file_path: targetFile } },
+      cfg,
+    );
+
+    // Stale entry → dedup should NOT fire, hook should pass through
+    assert.equal(res.output, null);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     delete process.env.CTX_WORKING_MEMORY_DIR;

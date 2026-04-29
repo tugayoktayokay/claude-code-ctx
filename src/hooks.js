@@ -181,12 +181,12 @@ function handlePreToolUse(input, config) {
           const decision = wm.dedupDecision(sid, filePath, content, {
             mtime: stat.mtimeMs,
             min_dedup_size_bytes: minSize,
-            recency_window_turns: wmCfg.recency_window_turns ?? 30,
+            recency_window_minutes: wmCfg.recency_window_minutes ?? 10,
           });
           if (decision && decision.action === 'dedup') {
             const reason =
               `[ctx working_memory] Already read at turn ${decision.priorTurn} (${decision.size}B). Content unchanged. ` +
-              `Recall via ctx_recall_read({path: "${filePath}"}) — cached content with ~200B meta.\n` +
+              `Recall via ctx_recall_read({path: "${filePath}", session_id: "${sid}"}) — cached content with ~200B meta.\n` +
               `• Trust your context: the prior read is still in your conversation history.`;
             const sessLog = sid.replace(/\s+/g, '_');
             logHook(config, `working_memory action=dedup_hit session=${sessLog} path="${filePath}" prior_turn=${decision.priorTurn} bytes_saved=${decision.size}`);
@@ -293,7 +293,7 @@ async function handlePostToolUse(input, config) {
         const tr2 = input.tool_response;
         const body = (tr2 && typeof tr2.content === 'string') ? tr2.content : null;
         const sidRec = String(input.session_id || '-');
-        if (filePath && body !== null && sidRec !== '-' && body.length >= (wmCfg.min_dedup_size_bytes ?? 1024)) {
+        if (filePath && body !== null && sidRec !== '-') {
           const wm = require('./working_memory.js');
           const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
           wm.recordRead(sidRec, filePath, body, { mtime: stat ? stat.mtimeMs : null });

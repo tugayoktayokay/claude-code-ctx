@@ -105,13 +105,15 @@ function dedupDecision(sid, filePath, content, opts = {}) {
   if (!prior) return null;
 
   const minSize = opts.min_dedup_size_bytes ?? 1024;
-  const recencyWindow = opts.recency_window_turns ?? 30;
-  const currentTurn = opts.current_turn ?? (loadSession(sid).next_turn);
+  const recencyWindowMs = (opts.recency_window_minutes ?? 10) * 60_000;
 
   const size = typeof content === 'string' ? content.length : 0;
   if (size < minSize) return null;
 
-  if (currentTurn - prior.turn > recencyWindow) return null;
+  const priorMs = Date.parse(prior.ts);
+  if (!Number.isFinite(priorMs)) return null; // bad timestamp, treat as no prior
+  const elapsedMs = (opts.now ?? Date.now()) - priorMs;
+  if (elapsedMs > recencyWindowMs) return null;
 
   const hash = hashContent(content);
   if (hash !== prior.hash) return null;

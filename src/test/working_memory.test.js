@@ -139,7 +139,7 @@ test('dedupDecision returns dedup when same hash + within recency + above size',
     const content = 'a'.repeat(2000);
     wm.recordRead(sid, '/x.md', content, { mtime: 'A' });
     const d = wm.dedupDecision(sid, '/x.md', content, {
-      mtime: 'A', current_turn: 5, recency_window_turns: 30, min_dedup_size_bytes: 1024,
+      mtime: 'A', now: Date.now(), recency_window_minutes: 10, min_dedup_size_bytes: 1024,
     });
     assert.equal(d.action, 'dedup');
     assert.equal(d.priorTurn, 1);
@@ -158,7 +158,7 @@ test('dedupDecision allows when content changed (different hash)', () => {
     const c2 = 'b'.repeat(2000);
     wm.recordRead(sid, '/x.md', c1, { mtime: 'A' });
     const d = wm.dedupDecision(sid, '/x.md', c2, {
-      mtime: 'A', current_turn: 2, recency_window_turns: 30, min_dedup_size_bytes: 1024,
+      mtime: 'A', now: Date.now(), recency_window_minutes: 10, min_dedup_size_bytes: 1024,
     });
     assert.equal(d, null);
   } finally {
@@ -174,7 +174,7 @@ test('dedupDecision allows when below size gate', () => {
     const small = 'tiny';
     wm.recordRead(sid, '/x.md', small, { mtime: 'A' });
     const d = wm.dedupDecision(sid, '/x.md', small, {
-      mtime: 'A', current_turn: 2, recency_window_turns: 30, min_dedup_size_bytes: 1024,
+      mtime: 'A', now: Date.now(), recency_window_minutes: 10, min_dedup_size_bytes: 1024,
     });
     assert.equal(d, null);
   } finally {
@@ -189,8 +189,10 @@ test('dedupDecision allows when recency window expired (refresh)', () => {
     const sid = 'sid-d5';
     const content = 'a'.repeat(2000);
     wm.recordRead(sid, '/x.md', content, { mtime: 'A' });
+    // Inject `now` 20 minutes after the prior record
+    const future = Date.now() + 20 * 60_000;
     const d = wm.dedupDecision(sid, '/x.md', content, {
-      mtime: 'A', current_turn: 50, recency_window_turns: 30, min_dedup_size_bytes: 1024,
+      mtime: 'A', now: future, recency_window_minutes: 10, min_dedup_size_bytes: 1024,
     });
     assert.equal(d, null);
   } finally {
