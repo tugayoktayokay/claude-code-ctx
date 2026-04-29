@@ -323,3 +323,19 @@ test('aggregate with empty log returns zero record, no division by zero', () => 
     require('fs').unlinkSync(emptyPath);
   }
 });
+
+test('parseLog recognizes working_memory event types', () => {
+  const { parseLogString } = require('../metrics.js');
+  const lines = [
+    '2026-04-29T10:00:00.000Z working_memory action=dedup_hit session=sid-1 path="/x.md" prior_turn=3 bytes_saved=2000',
+    '2026-04-29T10:01:00.000Z working_memory action=recall_call session=sid-1 path="/x.md" hit=true',
+  ].join('\n');
+  const { records, parseErrors } = parseLogString(lines);
+  assert.equal(parseErrors, 0);
+  assert.equal(records.length, 2);
+  assert.equal(records[0].evType, 'working_memory');
+  assert.equal(records[0].action, 'dedup_hit');
+  assert.equal(records[0].path, '/x.md');
+  assert.equal(records[1].action, 'recall_call');
+  assert.equal(records[1].hit, 'true');
+});

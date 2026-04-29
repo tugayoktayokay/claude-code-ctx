@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 
-const EVENT_TYPES = ['pre_tool', 'post_tool', 'cache-write', 'cache-read', 'cache-gc'];
+const EVENT_TYPES = ['pre_tool', 'post_tool', 'cache-write', 'cache-read', 'cache-gc', 'working_memory'];
 
 // Legitimate hook events emitted by pre-v0.7 ctx (and by other hook actions like
 // session-start/stop/auto-retrieve/pre-compact). They are not consumed by metrics.js
