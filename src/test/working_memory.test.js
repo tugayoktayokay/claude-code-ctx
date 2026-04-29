@@ -24,3 +24,20 @@ test('loadSession returns empty shape when session file does not exist', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('saveSession persists state and loadSession reads it back', () => {
+  const home = tmpHome();
+  try {
+    const state = {
+      session_id: 'sid-2',
+      next_turn: 3,
+      reads: { '/foo/bar.md': [{ turn: 1, hash: 'sha256:abc', size: 100, mtime: 'X', ts: 'Y' }] },
+    };
+    wm.saveSession(state);
+    const loaded = wm.loadSession('sid-2');
+    assert.deepEqual(loaded, state);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});

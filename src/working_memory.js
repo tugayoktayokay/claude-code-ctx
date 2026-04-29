@@ -34,4 +34,14 @@ function loadSession(sid) {
   }
 }
 
-module.exports = { loadSession, baseDir, sessionFile, blobDir, emptyState };
+function saveSession(state) {
+  if (!state || !state.session_id) return;
+  const dir = baseDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const file = sessionFile(state.session_id);
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(state));
+  fs.renameSync(tmp, file);
+}
+
+module.exports = { loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState };
