@@ -65,7 +65,25 @@
     "enabled": false,
     "min_dedup_size_bytes": 1024,
     "recency_window_minutes": 10,
-    "ttl_hours": 24
+    "ttl_hours": 24,
+    "bash_dedup": {
+      "enabled": false,
+      "fs_read_window_sec": 60,
+      "state_probe_window_sec": 30,
+      "fs_read_patterns": [
+        "^\\s*(grep|rg|egrep)\\s",
+        "^\\s*find\\s",
+        "^\\s*ls\\b",
+        "^\\s*tree\\b",
+        "^\\s*(cat|head|tail|wc|stat|file)\\s"
+      ],
+      "state_probe_patterns": [
+        "^\\s*git\\s+(log|status|diff|show|blame|branch|tag|remote)\\b",
+        "^\\s*(npm|pnpm|yarn)\\s+(ls|list)\\b",
+        "^\\s*kubectl\\s+(get|describe|logs)\\b",
+        "^\\s*docker\\s+(ps|images|logs)\\b"
+      ]
+    }
   },
   "backup": {
     "enabled": true,
