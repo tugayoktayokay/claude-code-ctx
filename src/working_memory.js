@@ -70,4 +70,38 @@ function readBlob(sid, hash) {
   try { return fs.readFileSync(file, 'utf8'); } catch { return null; }
 }
 
-module.exports = { loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState, hashContent, writeBlob, readBlob, blobPath };
+const MAX_ENTRIES_PER_PATH = 5;
+
+function recordRead(sid, filePath, content, opts = {}) {
+  const state = loadSession(sid);
+  const hash = hashContent(content);
+  const entry = {
+    turn: state.next_turn,
+    hash,
+    size: typeof content === 'string' ? content.length : 0,
+    mtime: opts.mtime || null,
+    ts: new Date().toISOString(),
+  };
+  if (!state.reads[filePath]) state.reads[filePath] = [];
+  state.reads[filePath].push(entry);
+  if (state.reads[filePath].length > MAX_ENTRIES_PER_PATH) {
+    state.reads[filePath] = state.reads[filePath].slice(-MAX_ENTRIES_PER_PATH);
+  }
+  state.next_turn++;
+  saveSession(state);
+  writeBlob(sid, hash, content);
+  return entry;
+}
+
+function lookupLatestRead(sid, filePath) {
+  const state = loadSession(sid);
+  const arr = state.reads[filePath];
+  if (!arr || !arr.length) return null;
+  return arr[arr.length - 1];
+}
+
+module.exports = {
+  loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState,
+  hashContent, writeBlob, readBlob, blobPath,
+  recordRead, lookupLatestRead, MAX_ENTRIES_PER_PATH,
+};

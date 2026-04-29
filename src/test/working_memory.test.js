@@ -75,3 +75,48 @@ test('readBlob returns null when blob missing', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('recordRead appends entry, increments next_turn, caps to 5 entries per path', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-rec';
+    const filePath = '/abs/file.md';
+    const content = 'X';
+    for (let i = 0; i < 7; i++) {
+      wm.recordRead(sid, filePath, content + i, { mtime: 'T' + i });
+    }
+    const state = wm.loadSession(sid);
+    assert.equal(state.next_turn, 8);
+    assert.equal(state.reads[filePath].length, 5);
+    assert.equal(state.reads[filePath][4].turn, 7);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('lookupLatestRead returns last entry for a path', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-lookup';
+    wm.recordRead(sid, '/x.md', 'one', { mtime: 'A' });
+    wm.recordRead(sid, '/x.md', 'two', { mtime: 'B' });
+    const last = wm.lookupLatestRead(sid, '/x.md');
+    assert.equal(last.turn, 2);
+    assert.equal(last.size, 3);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('lookupLatestRead returns null for unknown path', () => {
+  const home = tmpHome();
+  try {
+    const last = wm.lookupLatestRead('sid-empty', '/nope.md');
+    assert.equal(last, null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
