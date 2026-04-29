@@ -166,6 +166,49 @@ function handlePreCompact(input, config) {
 }
 
 function handlePreToolUse(input, config) {
+  // Working memory dedup branch (Phase 1)
+  try {
+    const wmCfg = config?.working_memory;
+    if (wmCfg?.enabled && input.tool_name === 'Read') {
+      const sid = String(input.session_id || '-');
+      const filePath = input.tool_input?.file_path || '';
+      if (sid !== '-' && filePath && fs.existsSync(filePath)) {
+        const wm = require('./working_memory.js');
+        const stat = fs.statSync(filePath);
+        const minSize = wmCfg.min_dedup_size_bytes ?? 1024;
+        if (stat.size >= minSize) {
+          const content = fs.readFileSync(filePath, 'utf8');
+          const decision = wm.dedupDecision(sid, filePath, content, {
+            mtime: stat.mtimeMs,
+            min_dedup_size_bytes: minSize,
+            recency_window_turns: wmCfg.recency_window_turns ?? 30,
+          });
+          if (decision && decision.action === 'dedup') {
+            const reason =
+              `[ctx working_memory] Already read at turn ${decision.priorTurn} (${decision.size}B). Content unchanged. ` +
+              `Recall via ctx_recall_read({path: "${filePath}"}) — cached content with ~200B meta.\n` +
+              `• Trust your context: the prior read is still in your conversation history.`;
+            const sessLog = sid.replace(/\s+/g, '_');
+            logHook(config, `working_memory action=dedup_hit session=${sessLog} path="${filePath}" prior_turn=${decision.priorTurn} bytes_saved=${decision.size}`);
+            return {
+              output: {
+                hookSpecificOutput: {
+                  hookEventName: 'PreToolUse',
+                  permissionDecision: 'deny',
+                  permissionDecisionReason: reason,
+                },
+              },
+              exitCode: 0,
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logHook(config, `working_memory error in pre_tool: ${err.message}`);
+  }
+  // --- end working memory branch ---
+
   const pre = config?.hooks?.pre_tool_use;
   if (!pre?.enabled) return { output: null, exitCode: 0 };
 

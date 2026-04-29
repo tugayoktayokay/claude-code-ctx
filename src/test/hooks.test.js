@@ -653,3 +653,82 @@ test('post_tool with missing tool_response logs exit=- size_bytes=0', async () =
     fs.rmSync(tmpHome, { recursive: true, force: true });
   }
 });
+
+test('PreToolUse Read: second identical Read triggers dedup deny + recall hint', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-hook-'));
+  const targetFile = path.join(tmp, 'CLAUDE.md');
+  const content = 'a'.repeat(2000);
+  fs.writeFileSync(targetFile, content);
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+
+    const sid = 'hook-sid-1';
+    const wm = require('../working_memory.js');
+    wm.recordRead(sid, targetFile, content, { mtime: 'A' });
+
+    const res = handlePreToolUse(
+      { session_id: sid, tool_name: 'Read', tool_input: { file_path: targetFile } },
+      cfg,
+    );
+
+    assert.equal(res.output.hookSpecificOutput.permissionDecision, 'deny');
+    assert.match(
+      res.output.hookSpecificOutput.permissionDecisionReason,
+      /working_memory.*Already read.*ctx_recall_read/,
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Read: first Read passes through (no prior record)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-hook-'));
+  const targetFile = path.join(tmp, 'README.md');
+  fs.writeFileSync(targetFile, 'x'.repeat(2000));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_turns: 30, ttl_hours: 24 };
+
+    const res = handlePreToolUse(
+      { session_id: 'sid-fresh', tool_name: 'Read', tool_input: { file_path: targetFile } },
+      cfg,
+    );
+
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Read: disabled flag bypasses dedup', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-hook-'));
+  const targetFile = path.join(tmp, 'CLAUDE.md');
+  const content = 'a'.repeat(2000);
+  fs.writeFileSync(targetFile, content);
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: false };
+
+    const wm = require('../working_memory.js');
+    wm.recordRead('sid-off', targetFile, content, { mtime: 'A' });
+
+    const res = handlePreToolUse(
+      { session_id: 'sid-off', tool_name: 'Read', tool_input: { file_path: targetFile } },
+      cfg,
+    );
+
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
