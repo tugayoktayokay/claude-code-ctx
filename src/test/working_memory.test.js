@@ -198,3 +198,36 @@ test('dedupDecision allows when recency window expired (refresh)', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('gcOldSessions removes session files + blob dirs older than ttl', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-old';
+    wm.recordRead(sid, '/x.md', 'content', { mtime: 'A' });
+    const sessFile = wm.sessionFile(sid);
+    const blobs = wm.blobDir(sid);
+    assert.ok(fs.existsSync(sessFile));
+    assert.ok(fs.existsSync(blobs));
+    const old = (Date.now() - 48 * 3600 * 1000) / 1000;
+    fs.utimesSync(sessFile, old, old);
+    const result = wm.gcOldSessions({ ttl_hours: 24 });
+    assert.equal(result.removed, 1);
+    assert.equal(fs.existsSync(sessFile), false);
+    assert.equal(fs.existsSync(blobs), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('gcOldSessions keeps fresh sessions', () => {
+  const home = tmpHome();
+  try {
+    wm.recordRead('sid-fresh', '/x.md', 'content', { mtime: 'A' });
+    const result = wm.gcOldSessions({ ttl_hours: 24 });
+    assert.equal(result.removed, 0);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});

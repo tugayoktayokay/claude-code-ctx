@@ -125,9 +125,41 @@ function dedupDecision(sid, filePath, content, opts = {}) {
   };
 }
 
+function gcOldSessions(opts = {}) {
+  const dir = baseDir();
+  if (!fs.existsSync(dir)) return { removed: 0, bytes_freed: 0 };
+  const ttlMs = (opts.ttl_hours || 24) * 3600 * 1000;
+  const now = Date.now();
+  let removed = 0;
+  let bytesFreed = 0;
+  let names;
+  try { names = fs.readdirSync(dir); } catch { return { removed: 0, bytes_freed: 0 }; }
+  for (const n of names) {
+    if (!n.endsWith('.json')) continue;
+    const file = path.join(dir, n);
+    let st;
+    try { st = fs.statSync(file); } catch { continue; }
+    if (now - st.mtimeMs <= ttlMs) continue;
+    const sid = n.slice(0, -5);
+    const blobs = blobDir(sid);
+    let blobSize = 0;
+    try {
+      if (fs.existsSync(blobs)) {
+        for (const bf of fs.readdirSync(blobs)) {
+          try { blobSize += fs.statSync(path.join(blobs, bf)).size; } catch {}
+        }
+        fs.rmSync(blobs, { recursive: true, force: true });
+      }
+    } catch {}
+    try { fs.unlinkSync(file); removed++; bytesFreed += st.size + blobSize; } catch {}
+  }
+  return { removed, bytes_freed: bytesFreed };
+}
+
 module.exports = {
   loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState,
   hashContent, writeBlob, readBlob, blobPath,
   recordRead, lookupLatestRead, MAX_ENTRIES_PER_PATH,
   dedupDecision,
+  gcOldSessions,
 };
