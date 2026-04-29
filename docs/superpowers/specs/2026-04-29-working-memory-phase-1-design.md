@@ -78,7 +78,7 @@ Capped to the latest 5 entries per path (older entries dropped).
 1. Extract file content from `tool_response`.
 2. Compute `sha256` hash.
 3. Append entry to `reads[path]` (cap to latest 5).
-4. Write content to `mcp_cache.js` keyed by `<session>:<hash>` so `ctx_recall_read` can serve it without disk re-read.
+4. Write content blob to `~/.config/ctx/working_memory/blobs/<session>/<hash>.txt` so `ctx_recall_read` can serve it without disk re-read. (Separate from `mcp_cache.js` because lifecycle is per-session, not 24h global.)
 5. Persist session memory file (atomic write).
 6. Increment session-local turn counter (stored in same file as `next_turn: N`).
 
@@ -91,11 +91,13 @@ No change — but document that working memory file is left for 24h then GC'd by
 Input: `{ path: string }`
 Behavior:
 1. Look up most recent entry in working memory for current session.
-2. If found: fetch content from `mcp_cache.js` (key `<session>:<hash>`); return content + meta `{turn, hash, size, recorded_at}`.
-3. If working memory has entry but cache miss (rare — cache GC'd): re-read file from disk if hash still matches, else return error.
+2. If found: fetch content blob from `working_memory/blobs/<sid>/<hash>.txt`; return content + meta `{turn, hash, size, recorded_at}`.
+3. If working memory has entry but blob missing (corrupt/manually deleted): re-read file from disk if hash still matches, else return error.
 4. If no working memory record: return error `{ error: "no working memory record for this path" }`.
 
-No new storage tier — `working_memory/<sid>.json` holds the path→hash map; `mcp_cache.js` holds the keyed content blobs.
+Storage layout:
+- `~/.config/ctx/working_memory/<sid>.json` — per-session path→hash map (lightweight)
+- `~/.config/ctx/working_memory/blobs/<sid>/<hash>.txt` — content blobs (heavier, GC'd with session)
 
 ### Module structure
 
