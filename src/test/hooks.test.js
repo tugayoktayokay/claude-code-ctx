@@ -826,3 +826,73 @@ test('PreToolUse Read: dedup does NOT fire when prior read is older than recency
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('PostToolUse Bash records allowlist matches with cached ref', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-post-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: ['^\\s*grep\\s'],
+        state_probe_patterns: ['^\\s*git\\s+status\\b'],
+      },
+    };
+
+    const sid = 'sid-bash-post';
+    await handlePostToolUse({
+      session_id: sid,
+      tool_name: 'Bash',
+      tool_input: { command: 'git status' },
+      tool_response: { stdout: 'On branch main\nnothing to commit', stderr: '', interrupted: false },
+    }, cfg);
+
+    const wm = require('../working_memory.js');
+    const last = wm.lookupLatestBashCall(sid, 'git status', process.cwd());
+    assert.ok(last, 'recorded');
+    assert.ok(last.ref, 'ref present');
+    assert.equal(last.exit, 0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PostToolUse Bash skips non-allowlist commands', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-skip-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: ['^\\s*grep\\s'],
+        state_probe_patterns: [],
+      },
+    };
+
+    const sid = 'sid-bash-skip';
+    await handlePostToolUse({
+      session_id: sid,
+      tool_name: 'Bash',
+      tool_input: { command: 'npm test' },
+      tool_response: { stdout: 'tests run', stderr: '', interrupted: false },
+    }, cfg);
+
+    const wm = require('../working_memory.js');
+    const last = wm.lookupLatestBashCall(sid, 'npm test', process.cwd());
+    assert.equal(last, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});

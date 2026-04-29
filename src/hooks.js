@@ -303,6 +303,34 @@ async function handlePostToolUse(input, config) {
       logHook(config, `working_memory error in post_tool: ${err.message}`);
     }
     // --- end working memory record ---
+    // --- working memory: record Bash output for dedup (Phase 2) ---
+    try {
+      const wmCfg = config?.working_memory;
+      const bdCfg = wmCfg?.bash_dedup;
+      if (wmCfg?.enabled && bdCfg?.enabled && toolName === 'Bash') {
+        const cmd = ti.command || '';
+        const cwd = String(input.cwd || process.cwd() || '');
+        const sidBash = String(input.session_id || '-');
+        const wm = require('./working_memory.js');
+        if (sidBash !== '-' && cmd && wm.matchBashAllowlist(cmd, bdCfg)) {
+          const tr3 = input.tool_response;
+          const stdout = (tr3 && typeof tr3.stdout === 'string') ? tr3.stdout : '';
+          const stderr = (tr3 && typeof tr3.stderr === 'string') ? tr3.stderr : '';
+          const combined = stderr ? `${stdout}\n--- stderr ---\n${stderr}` : stdout;
+          if (combined.length > 0) {
+            const cache = require('./mcp_cache.js');
+            const cached = cache.writeCache(combined, { gc: (config && config.cache && config.cache.gc) || {} });
+            wm.recordBashCall(sidBash, cmd, cwd, combined, {
+              exit: tr3?.interrupted ? 124 : 0,
+              ref: cached.ref,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      logHook(config, `working_memory bash post_tool error: ${err.message}`);
+    }
+    // --- end Bash dedup record ---
   } catch {}
   // --- end v0.7 metric event ---
 
