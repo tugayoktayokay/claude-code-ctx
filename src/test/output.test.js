@@ -24,6 +24,23 @@ test('printMetrics empty record prints no-events message', () => {
   assert.match(out, /no events recorded/i);
 });
 
+test('renderMetrics shows working memory section when records present', () => {
+  const { printMetrics: renderMetrics } = require('../output.js');
+  const result = {
+    pre_tool: { total: 0, deny: { total: 0 }, ask: { total: 0 } },
+    cache:    { writes: 0, reads: 0, hits: 0, misses: 0 },
+    working_memory: { dedup_hits: 5, bytes_saved: 12345, recall_calls: 1, recall_rate: 0.2 },
+  };
+  const lines = [];
+  const orig = console.log;
+  console.log = (s) => lines.push(String(s));
+  try { renderMetrics(result); } finally { console.log = orig; }
+  const out = lines.join('\n');
+  assert.match(out, /working memory/);
+  assert.match(out, /dedup hits:\s+5/);
+  assert.match(out, /12.*KB/);
+});
+
 test('printMetrics populated record includes key substrings', () => {
   const out = capture(() => printMetrics({
     range_days: 7, window_seconds: 60,

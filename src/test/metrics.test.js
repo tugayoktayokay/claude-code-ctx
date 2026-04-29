@@ -324,6 +324,22 @@ test('aggregate with empty log returns zero record, no division by zero', () => 
   }
 });
 
+test('aggregateMetrics surfaces working_memory dedup + recall counts', () => {
+  const { parseLogString, aggregateMetrics } = require('../metrics.js');
+  const lines = [
+    '2026-04-29T10:00:00.000Z working_memory action=dedup_hit session=s1 path="/a.md" prior_turn=3 bytes_saved=2000',
+    '2026-04-29T10:01:00.000Z working_memory action=dedup_hit session=s1 path="/b.md" prior_turn=4 bytes_saved=1500',
+    '2026-04-29T10:02:00.000Z working_memory action=recall_call session=s1 path="/a.md" hit=true',
+  ].join('\n');
+  const { records } = parseLogString(lines);
+  const agg = aggregateMetrics(records);
+  assert.ok(agg.working_memory);
+  assert.equal(agg.working_memory.dedup_hits, 2);
+  assert.equal(agg.working_memory.bytes_saved, 3500);
+  assert.equal(agg.working_memory.recall_calls, 1);
+  assert.equal(agg.working_memory.recall_rate, 0.5);
+});
+
 test('parseLog recognizes working_memory event types', () => {
   const { parseLogString } = require('../metrics.js');
   const lines = [

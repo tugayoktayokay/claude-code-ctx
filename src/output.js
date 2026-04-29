@@ -266,7 +266,8 @@ function printMetrics(r) {
   console.log('');
   console.log(C.bold + `  ctx metrics — last ${r.range_days} days` + C.reset);
   console.log('');
-  if ((r.pre_tool?.total || 0) === 0 && (r.cache?.writes || 0) === 0 && (r.cache?.reads || 0) === 0) {
+  const hasWm = r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls);
+  if ((r.pre_tool?.total || 0) === 0 && (r.cache?.writes || 0) === 0 && (r.cache?.reads || 0) === 0 && !hasWm) {
     console.log('  no events recorded yet');
     console.log('');
     if (r.parse_errors) console.log(C.dim + `  (${r.parse_errors} malformed log lines skipped)` + C.reset);
@@ -310,6 +311,16 @@ function printMetrics(r) {
       console.log(`    gc sweeps: ${r.cache.gc_sweeps} (evicted ${r.cache.gc_evicted} files, ${mb}MB freed)`);
     }
     console.log('');
+  }
+  if (r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls)) {
+    const wm = r.working_memory;
+    const kbSaved = (wm.bytes_saved / 1024).toFixed(1);
+    const recallPct = (wm.recall_rate * 100).toFixed(0);
+    console.log('');
+    console.log(C.dim + '  working memory (last 7d):' + C.reset);
+    console.log(`    dedup hits:    ${wm.dedup_hits} ${C.green}(saved ${kbSaved} KB)${C.reset}`);
+    console.log(`    recall calls:  ${wm.recall_calls}`);
+    console.log(`    recall rate:   ${recallPct}% ${recallPct >= 50 ? '(high — consider disabling)' : '(healthy)'}`);
   }
   if (r.unscoped) console.log(C.dim + `  (${r.unscoped} events without session_id — correlation skipped)` + C.reset);
   if (r.parse_errors) console.log(C.dim + `  (${r.parse_errors} malformed log lines skipped)` + C.reset);
