@@ -127,6 +127,25 @@ function dedupDecision(sid, filePath, content, opts = {}) {
   };
 }
 
+function cmdNorm(cmd) {
+  return String(cmd || '').replace(/^\s+|\s+$/g, '').replace(/[ \t]+/g, ' ');
+}
+
+function matchBashAllowlist(cmd, cfg) {
+  if (!cmd || !cfg) return null;
+  const fsRead = cfg.fs_read_patterns || [];
+  const stateProbe = cfg.state_probe_patterns || [];
+  for (const pat of fsRead) {
+    try { if (new RegExp(pat).test(cmd)) return { bucket: 'fs_read', window_sec: cfg.fs_read_window_sec ?? 60 }; }
+    catch { continue; }
+  }
+  for (const pat of stateProbe) {
+    try { if (new RegExp(pat).test(cmd)) return { bucket: 'state_probe', window_sec: cfg.state_probe_window_sec ?? 30 }; }
+    catch { continue; }
+  }
+  return null;
+}
+
 function gcOldSessions(opts = {}) {
   const dir = baseDir();
   if (!fs.existsSync(dir)) return { removed: 0, bytes_freed: 0 };
@@ -164,4 +183,5 @@ module.exports = {
   recordRead, lookupLatestRead, MAX_ENTRIES_PER_PATH,
   dedupDecision,
   gcOldSessions,
+  cmdNorm, matchBashAllowlist,
 };

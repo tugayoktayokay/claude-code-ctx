@@ -233,3 +233,60 @@ test('gcOldSessions keeps fresh sessions', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('matchBashAllowlist categorizes fs_read commands', () => {
+  const cfg = {
+    fs_read_patterns: ['^\\s*(grep|rg|egrep)\\s', '^\\s*find\\s', '^\\s*ls\\b', '^\\s*(cat|head|tail|wc)\\s'],
+    state_probe_patterns: ['^\\s*git\\s+(log|status|diff)\\b'],
+    fs_read_window_sec: 60,
+    state_probe_window_sec: 30,
+  };
+  assert.deepEqual(wm.matchBashAllowlist('grep useAuth src/', cfg), { bucket: 'fs_read', window_sec: 60 });
+  assert.deepEqual(wm.matchBashAllowlist('find . -name x', cfg),    { bucket: 'fs_read', window_sec: 60 });
+  assert.deepEqual(wm.matchBashAllowlist('ls -la src',  cfg),       { bucket: 'fs_read', window_sec: 60 });
+  assert.deepEqual(wm.matchBashAllowlist('cat README.md', cfg),     { bucket: 'fs_read', window_sec: 60 });
+});
+
+test('matchBashAllowlist categorizes state_probe commands', () => {
+  const cfg = {
+    fs_read_patterns: ['^\\s*(grep|rg|egrep)\\s'],
+    state_probe_patterns: ['^\\s*git\\s+(log|status|diff)\\b', '^\\s*(npm|pnpm)\\s+(ls|list)\\b'],
+    fs_read_window_sec: 60,
+    state_probe_window_sec: 30,
+  };
+  assert.deepEqual(wm.matchBashAllowlist('git status', cfg),        { bucket: 'state_probe', window_sec: 30 });
+  assert.deepEqual(wm.matchBashAllowlist('git log -10', cfg),       { bucket: 'state_probe', window_sec: 30 });
+  assert.deepEqual(wm.matchBashAllowlist('npm ls --depth=0', cfg),  { bucket: 'state_probe', window_sec: 30 });
+});
+
+test('matchBashAllowlist returns null for unmatched commands', () => {
+  const cfg = {
+    fs_read_patterns: ['^\\s*grep\\s'],
+    state_probe_patterns: ['^\\s*git\\s+status\\b'],
+    fs_read_window_sec: 60,
+    state_probe_window_sec: 30,
+  };
+  assert.equal(wm.matchBashAllowlist('npm test', cfg), null);
+  assert.equal(wm.matchBashAllowlist('git pull', cfg), null);
+  assert.equal(wm.matchBashAllowlist('rm -rf foo', cfg), null);
+});
+
+test('matchBashAllowlist prefers fs_read when both buckets match', () => {
+  const cfg = {
+    fs_read_patterns: ['ls'],
+    state_probe_patterns: ['ls'],
+    fs_read_window_sec: 60,
+    state_probe_window_sec: 30,
+  };
+  assert.deepEqual(wm.matchBashAllowlist('ls /tmp', cfg), { bucket: 'fs_read', window_sec: 60 });
+});
+
+test('matchBashAllowlist tolerates broken patterns and skips them', () => {
+  const cfg = {
+    fs_read_patterns: ['(unclosed', '^\\s*grep\\s'],
+    state_probe_patterns: [],
+    fs_read_window_sec: 60,
+    state_probe_window_sec: 30,
+  };
+  assert.deepEqual(wm.matchBashAllowlist('grep foo .', cfg), { bucket: 'fs_read', window_sec: 60 });
+});
