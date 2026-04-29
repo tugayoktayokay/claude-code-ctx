@@ -209,6 +209,52 @@ function handlePreToolUse(input, config) {
   }
   // --- end working memory branch ---
 
+  // Working memory Bash dedup branch (Phase 2)
+  try {
+    const wmCfg = config?.working_memory;
+    const bdCfg = wmCfg?.bash_dedup;
+    if (wmCfg?.enabled && bdCfg?.enabled && input.tool_name === 'Bash') {
+      const sid = String(input.session_id || '-');
+      const cmd = input.tool_input?.command || '';
+      const cwd = String(input.cwd || process.cwd() || '');
+      if (sid !== '-' && cmd) {
+        const wm = require('./working_memory.js');
+        const match = wm.matchBashAllowlist(cmd, bdCfg);
+        if (match) {
+          const decision = wm.bashDedupDecision(sid, cmd, cwd, { window_sec: match.window_sec });
+          if (decision && decision.action === 'bash_dedup') {
+            // Verify cached ref still resolves (mcp_cache may have GC'd it).
+            const cache = require('./mcp_cache.js');
+            const probe = cache.readCache(decision.ref, { offset: 0, limit: 1 });
+            if (probe && probe.error === 'not-found') {
+              return { output: null, exitCode: 0 };
+            }
+            const reason =
+              `[ctx working_memory] Same command ran ${decision.elapsedSec}s ago (turn ${decision.priorTurn}, exit ${decision.exit}, ${decision.size}B output). Output cached. ` +
+              `Recall via ctx_cache_get({ref: "${decision.ref}", offset: 0, limit: 4000}).\n` +
+              `• Re-run anyway: outside the ${match.window_sec}s window dedup will pass through automatically.`;
+            const sessLog = sid.replace(/\s+/g, '_');
+            const cmdEsc = decision.cmdNorm.replace(/"/g, '\\"').slice(0, 200);
+            logHook(config, `working_memory action=bash_dedup_hit session=${sessLog} cmd_norm="${cmdEsc}" prior_turn=${decision.priorTurn} bytes_saved=${decision.size} window_sec=${match.window_sec}`);
+            return {
+              output: {
+                hookSpecificOutput: {
+                  hookEventName: 'PreToolUse',
+                  permissionDecision: 'deny',
+                  permissionDecisionReason: reason,
+                },
+              },
+              exitCode: 0,
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logHook(config, `working_memory bash pre_tool error: ${err.message}`);
+  }
+  // --- end Bash dedup branch ---
+
   const pre = config?.hooks?.pre_tool_use;
   if (!pre?.enabled) return { output: null, exitCode: 0 };
 

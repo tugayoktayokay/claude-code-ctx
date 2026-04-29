@@ -896,3 +896,172 @@ test('PostToolUse Bash skips non-allowlist commands', async () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('PreToolUse Bash: same command within window triggers dedup deny', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-pre-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: ['^\\s*grep\\s'],
+        state_probe_patterns: ['^\\s*git\\s+status\\b'],
+      },
+    };
+
+    const sid = 'sid-pre-1';
+    const wm = require('../working_memory.js');
+    const cache = require('../mcp_cache.js');
+    const cached = cache.writeCache('On branch main', { gc: {} });
+    wm.recordBashCall(sid, 'git status', process.cwd(), 'On branch main', { exit: 0, ref: cached.ref });
+
+    const res = handlePreToolUse(
+      { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git status' }, cwd: process.cwd() },
+      cfg,
+    );
+    assert.equal(res.output.hookSpecificOutput.permissionDecision, 'deny');
+    assert.match(
+      res.output.hookSpecificOutput.permissionDecisionReason,
+      /Same command ran.*ctx_cache_get.*ref/,
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Bash: non-allowlist command always passes through', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-pre2-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: ['^\\s*grep\\s'],
+        state_probe_patterns: [],
+      },
+    };
+
+    const res = handlePreToolUse(
+      { session_id: 'sid-x', tool_name: 'Bash', tool_input: { command: 'npm test' } },
+      cfg,
+    );
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Bash: bash_dedup disabled flag bypasses', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-pre3-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: { enabled: false },
+    };
+
+    const wm = require('../working_memory.js');
+    wm.recordBashCall('sid-off', 'git status', process.cwd(), 'out', { exit: 0, ref: 'r' });
+
+    const res = handlePreToolUse(
+      { session_id: 'sid-off', tool_name: 'Bash', tool_input: { command: 'git status' }, cwd: process.cwd() },
+      cfg,
+    );
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Bash: cached ref expired → pass through', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-pre-expired-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: [],
+        state_probe_patterns: ['^\\s*git\\s+status\\b'],
+      },
+    };
+
+    const sid = 'sid-ref-gone';
+    const wm = require('../working_memory.js');
+    wm.recordBashCall(sid, 'git status', process.cwd(), 'output', { exit: 0, ref: 'nonexistent-ref-xyz' });
+
+    const res = handlePreToolUse(
+      { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git status' }, cwd: process.cwd() },
+      cfg,
+    );
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('PreToolUse Bash: window expired → pass through', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-bash-pre4-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = {
+      enabled: true,
+      bash_dedup: {
+        enabled: true,
+        fs_read_window_sec: 60,
+        state_probe_window_sec: 30,
+        fs_read_patterns: [],
+        state_probe_patterns: ['^\\s*git\\s+status\\b'],
+      },
+    };
+
+    const sid = 'sid-stale';
+    const wm = require('../working_memory.js');
+    const state = wm.loadSession(sid);
+    state.bash_calls = state.bash_calls || {};
+    const key = `${process.cwd()}|git status`;
+    state.bash_calls[key] = [{
+      turn: 1,
+      cmd_norm: 'git status',
+      cwd: process.cwd(),
+      ref: 'r1',
+      output_hash: wm.hashContent('out'),
+      exit: 0,
+      size: 3,
+      ts: new Date(Date.now() - 120 * 1000).toISOString(),
+    }];
+    state.next_turn = 2;
+    wm.saveSession(state);
+
+    const res = handlePreToolUse(
+      { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git status' }, cwd: process.cwd() },
+      cfg,
+    );
+    assert.equal(res.output, null);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
