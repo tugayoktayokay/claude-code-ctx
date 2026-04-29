@@ -20,6 +20,7 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
 
   results.push(checkNodeVersion());
   results.push(checkBm25Cache());
+  results.push(checkWorkingMemory());
   results.push(...checkConfig());
   results.push(...checkHooksInstalled(cwdBinary));
   results.push(...checkDaemon());
@@ -48,6 +49,20 @@ function checkBm25Cache() {
     return { ...CHECKS.ok, label: 'BM25 cache', detail: `${names.length} project(s), ${Math.round(total / 1024)} KB` };
   } catch (err) {
     return { ...CHECKS.warn, label: 'BM25 cache', detail: `unreadable: ${err.message}` };
+  }
+}
+
+function checkWorkingMemory() {
+  const dir = process.env.CTX_WORKING_MEMORY_DIR
+    || path.join(os.homedir(), '.config', 'ctx', 'working_memory');
+  if (!fs.existsSync(dir)) {
+    return { ...CHECKS.info, label: 'Working memory dir', detail: 'not yet created (will create on first use)' };
+  }
+  try {
+    const names = fs.readdirSync(dir).filter(n => n.endsWith('.json'));
+    return { ...CHECKS.ok, label: 'Working memory dir', detail: `${names.length} session file(s)` };
+  } catch (err) {
+    return { ...CHECKS.warn, label: 'Working memory dir', detail: `unreadable: ${err.message}` };
   }
 }
 
