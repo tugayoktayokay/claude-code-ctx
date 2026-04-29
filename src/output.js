@@ -266,7 +266,7 @@ function printMetrics(r) {
   console.log('');
   console.log(C.bold + `  ctx metrics — last ${r.range_days} days` + C.reset);
   console.log('');
-  const hasWm = r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls);
+  const hasWm = r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls || r.working_memory.bash_dedup_hits);
   if ((r.pre_tool?.total || 0) === 0 && (r.cache?.writes || 0) === 0 && (r.cache?.reads || 0) === 0 && !hasWm) {
     console.log('  no events recorded yet');
     console.log('');
@@ -312,15 +312,23 @@ function printMetrics(r) {
     }
     console.log('');
   }
-  if (r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls)) {
+  if (r.working_memory && (r.working_memory.dedup_hits || r.working_memory.recall_calls || r.working_memory.bash_dedup_hits)) {
     const wm = r.working_memory;
     const kbSaved = (wm.bytes_saved / 1024).toFixed(1);
     const recallPct = (wm.recall_rate * 100).toFixed(0);
+    const bashKbSaved = ((wm.bash_bytes_saved || 0) / 1024).toFixed(1);
     console.log('');
     console.log(C.dim + '  working memory (last 7d):' + C.reset);
-    console.log(`    dedup hits:    ${wm.dedup_hits} ${C.green}(saved ${kbSaved} KB)${C.reset}`);
-    console.log(`    recall calls:  ${wm.recall_calls}`);
-    console.log(`    recall rate:   ${recallPct}% ${recallPct >= 50 ? '(high — consider disabling)' : '(healthy)'}`);
+    if (wm.dedup_hits) {
+      console.log(`    file dedup hits:  ${wm.dedup_hits} ${C.green}(saved ${kbSaved} KB)${C.reset}`);
+    }
+    if (wm.bash_dedup_hits) {
+      console.log(`    bash dedup hits:  ${wm.bash_dedup_hits} ${C.green}(saved ${bashKbSaved} KB)${C.reset}`);
+    }
+    if (wm.recall_calls || wm.dedup_hits) {
+      console.log(`    recall calls:     ${wm.recall_calls}`);
+      console.log(`    recall rate:      ${recallPct}% ${Number(recallPct) >= 50 ? '(high — consider disabling)' : '(healthy)'}`);
+    }
   }
   if (r.unscoped) console.log(C.dim + `  (${r.unscoped} events without session_id — correlation skipped)` + C.reset);
   if (r.parse_errors) console.log(C.dim + `  (${r.parse_errors} malformed log lines skipped)` + C.reset);

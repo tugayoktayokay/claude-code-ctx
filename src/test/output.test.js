@@ -41,6 +41,25 @@ test('renderMetrics shows working memory section when records present', () => {
   assert.match(out, /12.*KB/);
 });
 
+test('renderMetrics shows bash dedup line when bash_dedup_hits > 0', () => {
+  const { printMetrics } = require('../output.js');
+  const result = {
+    pre_tool: { total: 0, deny: { total: 0 }, ask: { total: 0 } },
+    cache:    { writes: 0, reads: 0, hits: 0, misses: 0 },
+    working_memory: {
+      dedup_hits: 0, bytes_saved: 0, recall_calls: 0, recall_rate: 0,
+      bash_dedup_hits: 4, bash_bytes_saved: 8200,
+    },
+  };
+  const lines = [];
+  const orig = console.log;
+  console.log = (s) => lines.push(String(s));
+  try { printMetrics(result); } finally { console.log = orig; }
+  const out = lines.join('\n');
+  assert.match(out, /bash dedup hits:\s+4/);
+  assert.match(out, /8\.0 KB|8 KB/);
+});
+
 test('printMetrics populated record includes key substrings', () => {
   const out = capture(() => printMetrics({
     range_days: 7, window_seconds: 60,
