@@ -146,6 +146,44 @@ function matchBashAllowlist(cmd, cfg) {
   return null;
 }
 
+const MAX_BASH_ENTRIES_PER_KEY = 5;
+
+function bashKey(cwd, cmd) {
+  return `${cwd}|${cmdNorm(cmd)}`;
+}
+
+function recordBashCall(sid, cmd, cwd, output, opts = {}) {
+  const state = loadSession(sid);
+  if (!state.bash_calls) state.bash_calls = {};
+  const key = bashKey(cwd, cmd);
+  const entry = {
+    turn: state.next_turn,
+    cmd_norm: cmdNorm(cmd),
+    cwd: String(cwd || ''),
+    ref: opts.ref || null,
+    output_hash: hashContent(typeof output === 'string' ? output : ''),
+    exit: typeof opts.exit === 'number' ? opts.exit : null,
+    size: typeof output === 'string' ? output.length : 0,
+    ts: new Date().toISOString(),
+  };
+  if (!state.bash_calls[key]) state.bash_calls[key] = [];
+  state.bash_calls[key].push(entry);
+  if (state.bash_calls[key].length > MAX_BASH_ENTRIES_PER_KEY) {
+    state.bash_calls[key] = state.bash_calls[key].slice(-MAX_BASH_ENTRIES_PER_KEY);
+  }
+  state.next_turn++;
+  saveSession(state);
+  return entry;
+}
+
+function lookupLatestBashCall(sid, cmd, cwd) {
+  const state = loadSession(sid);
+  if (!state.bash_calls) return null;
+  const arr = state.bash_calls[bashKey(cwd, cmd)];
+  if (!arr || !arr.length) return null;
+  return arr[arr.length - 1];
+}
+
 function gcOldSessions(opts = {}) {
   const dir = baseDir();
   if (!fs.existsSync(dir)) return { removed: 0, bytes_freed: 0 };
@@ -184,4 +222,5 @@ module.exports = {
   dedupDecision,
   gcOldSessions,
   cmdNorm, matchBashAllowlist,
+  MAX_BASH_ENTRIES_PER_KEY, bashKey, recordBashCall, lookupLatestBashCall,
 };

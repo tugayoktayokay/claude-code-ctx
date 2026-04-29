@@ -290,3 +290,48 @@ test('matchBashAllowlist tolerates broken patterns and skips them', () => {
   };
   assert.deepEqual(wm.matchBashAllowlist('grep foo .', cfg), { bucket: 'fs_read', window_sec: 60 });
 });
+
+test('recordBashCall stores entry under <cwd>|<cmd_norm> key, caps to 5', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-bash-1';
+    for (let i = 0; i < 7; i++) {
+      wm.recordBashCall(sid, 'git status', '/proj', `out${i}`, { exit: 0, ref: `r${i}` });
+    }
+    const state = wm.loadSession(sid);
+    const key = '/proj|git status';
+    assert.equal(state.bash_calls[key].length, 5);
+    assert.equal(state.bash_calls[key][4].ref, 'r6');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('recordBashCall normalizes whitespace in cmd key', () => {
+  const home = tmpHome();
+  try {
+    wm.recordBashCall('sid-norm', '  git   status  ', '/proj', 'out', { exit: 0, ref: 'r1' });
+    const state = wm.loadSession('sid-norm');
+    assert.ok(state.bash_calls['/proj|git status']);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('lookupLatestBashCall returns last entry or null', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-look';
+    assert.equal(wm.lookupLatestBashCall(sid, 'git status', '/proj'), null);
+    wm.recordBashCall(sid, 'git status', '/proj', 'old', { exit: 0, ref: 'r1' });
+    wm.recordBashCall(sid, 'git status', '/proj', 'new', { exit: 0, ref: 'r2' });
+    const last = wm.lookupLatestBashCall(sid, 'git status', '/proj');
+    assert.equal(last.ref, 'r2');
+    assert.equal(last.size, 3);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
