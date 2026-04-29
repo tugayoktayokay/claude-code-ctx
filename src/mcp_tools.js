@@ -161,11 +161,23 @@ const memoryTools = [
       const wm = require('./working_memory.js');
       const filePath = String(args.path || '');
       const sid = String(args.session_id || process.env.CLAUDE_SESSION_ID || '-');
-      if (!filePath) return okText('error: missing path');
+      const logRecall = (hit) => {
+        try {
+          const osMod = require('node:os');
+          const pathMod = require('node:path');
+          const fsMod = require('node:fs');
+          const logPath = pathMod.join(osMod.homedir(), '.config', 'ctx', 'hooks.log');
+          fsMod.mkdirSync(pathMod.dirname(logPath), { recursive: true });
+          const safeSid = sid.replace(/\s+/g, '_');
+          fsMod.appendFileSync(logPath, `${new Date().toISOString()} working_memory action=recall_call session=${safeSid} path="${filePath}" hit=${hit}\n`);
+        } catch {}
+      };
+      if (!filePath) { logRecall(false); return okText('error: missing path'); }
       const last = wm.lookupLatestRead(sid, filePath);
-      if (!last) return okText(`error: no working memory record for ${filePath}`);
+      if (!last) { logRecall(false); return okText(`error: no working memory record for ${filePath}`); }
       const blob = wm.readBlob(sid, last.hash);
-      if (blob == null) return okText(`error: blob missing for hash ${last.hash}`);
+      if (blob == null) { logRecall(false); return okText(`error: blob missing for hash ${last.hash}`); }
+      logRecall(true);
       return okText(
         `[ctx_recall_read ${filePath}, ${last.size}B, turn=${last.turn}, hash=${last.hash.slice(0, 22)}, recorded=${last.ts}]\n${blob}`,
       );

@@ -126,3 +126,33 @@ test('ctx_recall_read returns error for unknown path', async () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('ctx_recall_read logs working_memory recall_call event', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-mcp-log-'));
+  const fakeHome = path.join(tmp, 'home');
+  fs.mkdirSync(path.join(fakeHome, '.config', 'ctx'), { recursive: true });
+  const origHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+  delete require.cache[require.resolve('../working_memory.js')];
+  delete require.cache[require.resolve('../mcp_tools.js')];
+  const wm = require('../working_memory.js');
+
+  try {
+    wm.recordRead('sid-log', '/x.md', 'big content here that is large enough');
+
+    const { allTools } = require('../mcp_tools.js');
+    const tool = allTools().find(t => t.name === 'ctx_recall_read');
+    await tool.handler({ path: '/x.md', session_id: 'sid-log' }, { config: {} });
+
+    const logFile = path.join(fakeHome, '.config', 'ctx', 'hooks.log');
+    assert.ok(fs.existsSync(logFile));
+    const log = fs.readFileSync(logFile, 'utf8');
+    assert.match(log, /working_memory action=recall_call session=sid-log .*hit=true/);
+  } finally {
+    process.env.HOME = origHome;
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete require.cache[require.resolve('../mcp_tools.js')];
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
