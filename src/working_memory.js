@@ -184,6 +184,29 @@ function lookupLatestBashCall(sid, cmd, cwd) {
   return arr[arr.length - 1];
 }
 
+function bashDedupDecision(sid, cmd, cwd, opts = {}) {
+  const prior = lookupLatestBashCall(sid, cmd, cwd);
+  if (!prior) return null;
+  if (!prior.ref) return null;
+
+  const windowMs = (opts.window_sec ?? 60) * 1000;
+  const priorMs = Date.parse(prior.ts);
+  if (!Number.isFinite(priorMs)) return null;
+  const elapsedMs = (opts.now ?? Date.now()) - priorMs;
+  if (elapsedMs > windowMs) return null;
+
+  return {
+    action: 'bash_dedup',
+    priorTurn: prior.turn,
+    ref: prior.ref,
+    size: prior.size,
+    exit: prior.exit,
+    elapsedSec: Math.round(elapsedMs / 1000),
+    cmdNorm: prior.cmd_norm,
+    recordedAt: prior.ts,
+  };
+}
+
 function gcOldSessions(opts = {}) {
   const dir = baseDir();
   if (!fs.existsSync(dir)) return { removed: 0, bytes_freed: 0 };
@@ -223,4 +246,5 @@ module.exports = {
   gcOldSessions,
   cmdNorm, matchBashAllowlist,
   MAX_BASH_ENTRIES_PER_KEY, bashKey, recordBashCall, lookupLatestBashCall,
+  bashDedupDecision,
 };

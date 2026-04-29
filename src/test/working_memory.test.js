@@ -335,3 +335,58 @@ test('lookupLatestBashCall returns last entry or null', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('bashDedupDecision returns null when no prior call', () => {
+  const home = tmpHome();
+  try {
+    const d = wm.bashDedupDecision('sid-bd1', 'git status', '/proj', { window_sec: 30 });
+    assert.equal(d, null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('bashDedupDecision returns dedup when within window', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-bd2';
+    wm.recordBashCall(sid, 'git status', '/proj', 'output', { exit: 0, ref: 'r1' });
+    const d = wm.bashDedupDecision(sid, 'git status', '/proj', { window_sec: 30, now: Date.now() });
+    assert.equal(d.action, 'bash_dedup');
+    assert.equal(d.priorTurn, 1);
+    assert.equal(d.ref, 'r1');
+    assert.equal(d.size, 6);
+    assert.equal(d.exit, 0);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('bashDedupDecision allows when window expired', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-bd3';
+    wm.recordBashCall(sid, 'git status', '/proj', 'output', { exit: 0, ref: 'r1' });
+    const future = Date.now() + 120 * 1000;
+    const d = wm.bashDedupDecision(sid, 'git status', '/proj', { window_sec: 30, now: future });
+    assert.equal(d, null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('bashDedupDecision returns null when prior has no ref (cache write failed)', () => {
+  const home = tmpHome();
+  try {
+    const sid = 'sid-bd4';
+    wm.recordBashCall(sid, 'git status', '/proj', 'output', { exit: 0, ref: null });
+    const d = wm.bashDedupDecision(sid, 'git status', '/proj', { window_sec: 30 });
+    assert.equal(d, null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
