@@ -1,8 +1,9 @@
 'use strict';
 
-const fs   = require('node:fs');
-const os   = require('node:os');
-const path = require('node:path');
+const fs     = require('node:fs');
+const os     = require('node:os');
+const path   = require('node:path');
+const crypto = require('node:crypto');
 
 function baseDir() {
   return process.env.CTX_WORKING_MEMORY_DIR
@@ -44,4 +45,29 @@ function saveSession(state) {
   fs.renameSync(tmp, file);
 }
 
-module.exports = { loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState };
+function hashContent(content) {
+  const buf = typeof content === 'string' ? content : String(content);
+  return 'sha256:' + crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16);
+}
+
+function blobPath(sid, hash) {
+  const safe = hash.replace(/:/g, '_');
+  return path.join(blobDir(sid), safe + '.txt');
+}
+
+function writeBlob(sid, hash, content) {
+  const dir = blobDir(sid);
+  fs.mkdirSync(dir, { recursive: true });
+  const file = blobPath(sid, hash);
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, content);
+  fs.renameSync(tmp, file);
+}
+
+function readBlob(sid, hash) {
+  const file = blobPath(sid, hash);
+  if (!fs.existsSync(file)) return null;
+  try { return fs.readFileSync(file, 'utf8'); } catch { return null; }
+}
+
+module.exports = { loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState, hashContent, writeBlob, readBlob, blobPath };

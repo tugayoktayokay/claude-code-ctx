@@ -41,3 +41,37 @@ test('saveSession persists state and loadSession reads it back', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('hashContent returns deterministic sha256 prefix', () => {
+  const h1 = wm.hashContent('hello world');
+  const h2 = wm.hashContent('hello world');
+  const h3 = wm.hashContent('different');
+  assert.equal(h1, h2);
+  assert.notEqual(h1, h3);
+  assert.match(h1, /^sha256:[0-9a-f]{16}$/);
+});
+
+test('writeBlob + readBlob round-trip', () => {
+  const home = tmpHome();
+  try {
+    const content = 'CLAUDE.md body here';
+    const hash = wm.hashContent(content);
+    wm.writeBlob('sid-3', hash, content);
+    const back = wm.readBlob('sid-3', hash);
+    assert.equal(back, content);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('readBlob returns null when blob missing', () => {
+  const home = tmpHome();
+  try {
+    const back = wm.readBlob('sid-x', 'sha256:nope');
+    assert.equal(back, null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
