@@ -100,8 +100,34 @@ function lookupLatestRead(sid, filePath) {
   return arr[arr.length - 1];
 }
 
+function dedupDecision(sid, filePath, content, opts = {}) {
+  const prior = lookupLatestRead(sid, filePath);
+  if (!prior) return null;
+
+  const minSize = opts.min_dedup_size_bytes ?? 1024;
+  const recencyWindow = opts.recency_window_turns ?? 30;
+  const currentTurn = opts.current_turn ?? (loadSession(sid).next_turn);
+
+  const size = typeof content === 'string' ? content.length : 0;
+  if (size < minSize) return null;
+
+  if (currentTurn - prior.turn > recencyWindow) return null;
+
+  const hash = hashContent(content);
+  if (hash !== prior.hash) return null;
+
+  return {
+    action: 'dedup',
+    priorTurn: prior.turn,
+    hash: prior.hash,
+    size: prior.size,
+    recordedAt: prior.ts,
+  };
+}
+
 module.exports = {
   loadSession, saveSession, baseDir, sessionFile, blobDir, emptyState,
   hashContent, writeBlob, readBlob, blobPath,
   recordRead, lookupLatestRead, MAX_ENTRIES_PER_PATH,
+  dedupDecision,
 };
