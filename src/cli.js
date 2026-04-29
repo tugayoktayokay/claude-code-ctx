@@ -931,16 +931,23 @@ function runPrune(args, config) {
   if (!totalRemove) {
     console.log(C.gray + '  Nothing to prune.' + C.reset);
     console.log('');
-    return 0;
-  }
-
-  if (!apply) {
+  } else if (!apply) {
     console.log(C.bold + `  Dry run: ${totalRemove} file(s) would be removed, ${totalKeep} kept.` + C.reset);
     console.log(C.dim + '  Rerun with --apply to actually delete.' + C.reset);
+    console.log('');
   } else {
     console.log(C.bold + C.green + `  ✓ Removed ${totalApplied} file(s) total.` + C.reset);
+    console.log('');
   }
-  console.log('');
+
+  try {
+    const { pruneWorkingMemory } = require('./prune.js');
+    const wmRes = pruneWorkingMemory({ ttl_hours: 24 });
+    if (wmRes.removed) {
+      console.log(`  working_memory: removed ${wmRes.removed} session file(s), freed ${(wmRes.bytes_freed/1024).toFixed(1)} KB`);
+    }
+  } catch {}
+
   return 0;
 }
 

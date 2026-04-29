@@ -96,10 +96,16 @@ function planFromOpts(memoryDir, opts) {
   return planPrune(memoryDir, { olderThanMs, keepLast });
 }
 
+function pruneWorkingMemory(opts = {}) {
+  const wm = require('./working_memory.js');
+  return wm.gcOldSessions(opts);
+}
+
 module.exports = {
   parseDuration,
   listProjectMemoryDirs,
   planPrune,
   applyPrune,
   planFromOpts,
+  pruneWorkingMemory,
 };

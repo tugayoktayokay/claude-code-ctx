@@ -120,3 +120,23 @@ test('planPrune on missing dir returns exists=false', () => {
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test('pruneWorkingMemory removes session files older than ttl', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-prune-wm-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+  delete require.cache[require.resolve('../working_memory.js')];
+  const wm = require('../working_memory.js');
+  try {
+    wm.recordRead('sid-old', '/x.md', 'content');
+    const sessFile = wm.sessionFile('sid-old');
+    const old = (Date.now() - 48 * 3600 * 1000) / 1000;
+    fs.utimesSync(sessFile, old, old);
+
+    const { pruneWorkingMemory } = require('../prune.js');
+    const result = pruneWorkingMemory({ ttl_hours: 24 });
+    assert.equal(result.removed, 1);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
