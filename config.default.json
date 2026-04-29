@@ -61,6 +61,12 @@
       "sweep_probability": 0.05
     }
   },
+  "working_memory": {
+    "enabled": false,
+    "min_dedup_size_bytes": 1024,
+    "recency_window_turns": 30,
+    "ttl_hours": 24
+  },
   "backup": {
     "enabled": true,
     "dir": "~/.config/ctx/backups",
