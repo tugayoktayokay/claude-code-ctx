@@ -23,7 +23,7 @@ These are load-bearing promises of the project, not style preferences:
 - **Never auto-type `/clear`.** Auto-snapshot before `/clear` and auto-restore after are fine, but the user always types the slash command.
 - **Alerts are state-driven, not time-driven.** Notifications fire on threshold crossings, new git commits, or Stop hook events — never on "N minutes elapsed".
 - **Hooks must degrade silently.** On any error, hook handlers log to `~/.config/ctx/hooks.log` and return exit 0. A broken hook never blocks the user's Claude Code session.
-- **Working memory is per-session and ephemeral.** Stored under `~/.config/ctx/working_memory/<sid>.{json,blobs/...}`. Hash-gated (changed files always re-Read) and wall-clock recency-gated (re-Read passes through after `recency_window_minutes`, default 10). Disable via `working_memory.enabled = false` (default).
+- **Working memory is per-session and ephemeral.** Stored under `~/.config/ctx/working_memory/<sid>.{json,blobs/...}`. Two dedup paths: (a) Read tool — hash-gated, wall-clock recency-gated (`recency_window_minutes`, default 10); (b) Bash tool — allowlist-gated for read-only and state-probe commands, time-windowed (`fs_read_window_sec` 60s, `state_probe_window_sec` 30s). Mutation commands always pass through. Both gated by `working_memory.enabled` and `working_memory.bash_dedup.enabled`, both default `false`.
 
 ## Architecture
 
