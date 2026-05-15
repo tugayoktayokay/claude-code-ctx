@@ -154,10 +154,11 @@ const memoryTools = [
       properties: {
         path:       { type: 'string', description: 'Absolute path of the previously-read file.' },
         session_id: { type: 'string', description: 'Session id (the harness usually fills this; pass-through).' },
+        limit_bytes: { type: 'integer', description: 'Return inline if cached content is under this (default from config: 2500).' },
       },
       required: ['path'],
     },
-    handler: async (args, { config: _config } = {}) => {
+    handler: async (args, { config } = {}) => {
       const wm = require('./working_memory.js');
       const filePath = String(args.path || '');
       const sid = String(args.session_id || process.env.CLAUDE_SESSION_ID || '-');
@@ -178,16 +179,44 @@ const memoryTools = [
       const blob = wm.readBlob(sid, last.hash);
       if (blob == null) { logRecall(false); return okText(`error: blob missing for hash ${last.hash}`); }
       logRecall(true);
-      return okText(
-        `[ctx_recall_read ${filePath}, ${last.size}B, turn=${last.turn}, hash=${last.hash.slice(0, 22)}, recorded=${last.ts}]\n${blob}`,
-      );
+      const header = `[ctx_recall_read ${filePath}, ${last.size}B, turn=${last.turn}, hash=${last.hash.slice(0, 22)}, recorded=${last.ts}]`;
+      const limitBytes = parseByteLimit(args.limit_bytes, defaultInlineLimit(config));
+      if (blob.length <= limitBytes) {
+        return okText(`${header}\n${blob}`);
+      }
+      const cached = cache.writeCache(blob, { gc: (config && config.cache && config.cache.gc) || {} });
+      return okText([
+        `${header} → summarized`,
+        `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 to read chunks)`,
+        '',
+        cache.summarizeLines(blob, summaryOpts(config)),
+      ].join('\n'));
     },
   },
 ];
 
 function parseByteLimit(v, fallback) {
-  if (typeof v === 'number') return v;
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
   return fallback;
+}
+
+function defaultInlineLimit(config) {
+  return parseByteLimit(config?.mcp?.inline_limit_bytes, 2500);
+}
+
+function summaryOpts(config, overrides = {}) {
+  const s = config?.mcp?.summary || {};
+  return {
+    head: parseByteLimit(overrides.head ?? s.head_lines, 12),
+    tail: parseByteLimit(overrides.tail ?? s.tail_lines, 6),
+    maxLineLen: parseByteLimit(overrides.maxLineLen ?? s.max_line_len, 220),
+  };
+}
+
+function cacheGetLimit(args, config) {
+  const requested = parseByteLimit(args.limit, parseByteLimit(config?.mcp?.cache_get_default_limit, 2500));
+  const max = parseByteLimit(config?.mcp?.cache_get_max_limit, 8000);
+  return Math.min(requested, max);
 }
 
 const wrapperTools = [
@@ -199,7 +228,7 @@ const wrapperTools = [
       properties: {
         command:      { type: 'string', description: 'Shell command to run.' },
         cwd:          { type: 'string', description: 'Working directory (defaults to user cwd).' },
-        limit_bytes:  { type: 'integer', description: 'Return inline if output under this (default 5000).' },
+        limit_bytes:  { type: 'integer', description: 'Return inline if output under this (default from config: 2500).' },
         timeout_ms:   { type: 'integer', description: 'Kill after this many ms (default 30000).' },
       },
       required: ['command'],
@@ -207,7 +236,7 @@ const wrapperTools = [
     handler: async (args, { config, signal, sendProgress } = {}) => {
       const command    = String(args.command || '');
       const cwd        = args.cwd || process.cwd();
-      const limitBytes = parseByteLimit(args.limit_bytes, 5000);
+      const limitBytes = parseByteLimit(args.limit_bytes, defaultInlineLimit(config));
       const timeoutMs  = args.timeout_ms || 30000;
 
       return new Promise((resolve) => {
@@ -273,10 +302,10 @@ const wrapperTools = [
           }
 
           const cached = cache.writeCache(combined, { gc: (config && config.cache && config.cache.gc) || {} });
-          const summary = cache.summarizeLines(combined, { head: 25, tail: 10 });
+          const summary = cache.summarizeLines(combined, summaryOpts(config));
           resolve(okText([
             `[ctx_shell ${status}, ${combined.length}B → summarized]`,
-            `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 limit=4000 to read chunks)`,
+            `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 to read chunks)`,
             '',
             summary,
           ].join('\n')));
@@ -298,14 +327,14 @@ const wrapperTools = [
       properties: {
         path:         { type: 'string' },
         offset:       { type: 'integer', description: 'Byte offset to start at.' },
-        limit_bytes:  { type: 'integer', description: 'Return inline if under this (default 5000).' },
+        limit_bytes:  { type: 'integer', description: 'Return inline if under this (default from config: 2500).' },
       },
       required: ['path'],
     },
     handler: async (args, { config }) => {
       const filePath   = String(args.path || '');
       const offset     = args.offset || 0;
-      const limitBytes = parseByteLimit(args.limit_bytes, 5000);
+      const limitBytes = parseByteLimit(args.limit_bytes, defaultInlineLimit(config));
 
       if (!fs.existsSync(filePath)) return okText(`error: not found: ${filePath}`);
       const stat = fs.statSync(filePath);
@@ -319,7 +348,7 @@ const wrapperTools = [
       }
 
       const cached = cache.writeCache(content, { gc: (config && config.cache && config.cache.gc) || {} });
-      const summary = cache.summarizeLines(slice, { head: 30, tail: 10 });
+      const summary = cache.summarizeLines(slice, summaryOpts(config));
       return okText([
         `[ctx_read ${filePath}, ${content.length}B → summarized]`,
         `ref: ${cached.ref}  (ctx_cache_get to read chunks)`,
@@ -338,6 +367,7 @@ const wrapperTools = [
         path:        { type: 'string', description: 'File or directory to search.' },
         max_results: { type: 'integer', description: 'Hard cap (default 100).' },
         glob:        { type: 'string', description: 'Optional glob filter.' },
+        limit_bytes: { type: 'integer', description: 'Return inline if matches are under this (default from config: 2500).' },
       },
       required: ['pattern'],
     },
@@ -345,6 +375,7 @@ const wrapperTools = [
       const pattern    = String(args.pattern || '');
       const searchPath = args.path || process.cwd();
       const maxResults = args.max_results || 100;
+      const limitBytes = parseByteLimit(args.limit_bytes, defaultInlineLimit(config));
 
       const rgArgs = ['-n', '--max-count', String(maxResults), pattern, searchPath];
       if (args.glob) { rgArgs.splice(0, 0, '--glob', args.glob); }
@@ -364,12 +395,12 @@ const wrapperTools = [
       const stderr = result.stderr || '';
       if (!stdout && !stderr) return okText('[ctx_grep] no matches');
 
-      if (stdout.length <= 5000) {
+      if (stdout.length <= limitBytes) {
         return okText(`[ctx_grep ${stdout.split('\n').filter(Boolean).length} matches]\n${stdout}`);
       }
 
       const cached = cache.writeCache(stdout, { gc: (config && config.cache && config.cache.gc) || {} });
-      const summary = cache.summarizeLines(stdout, { head: 40, tail: 5 });
+      const summary = cache.summarizeLines(stdout, summaryOpts(config));
       return okText([
         `[ctx_grep ${stdout.length}B of matches → summarized]`,
         `ref: ${cached.ref}`,
@@ -391,10 +422,12 @@ const wrapperTools = [
       required: ['ref'],
     },
     handler: async (args, { config: _config }) => {
-      const r = cache.readCache(String(args.ref || ''), { offset: args.offset || 0, limit: args.limit || 4000 });
+      const limit = cacheGetLimit(args, _config);
+      const r = cache.readCache(String(args.ref || ''), { offset: args.offset || 0, limit });
       if (r.error === 'not-found') return okText(`error: cache miss (expired or invalid ref)`);
+      const capped = args.limit && args.limit > limit ? ` (capped at ${limit}B)` : '';
       return okText([
-        `[ctx_cache_get ref=${args.ref} offset=${r.offset} returned=${r.returned}B of ${r.total}B total]`,
+        `[ctx_cache_get ref=${args.ref} offset=${r.offset} returned=${r.returned}B of ${r.total}B total${capped}]`,
         '',
         r.content,
       ].join('\n'));

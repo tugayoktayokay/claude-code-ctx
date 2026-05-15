@@ -386,6 +386,50 @@ test('user-prompt-submit auto-retrieves past snapshot on first prompt', () => {
   }
 });
 
+test('user-prompt-submit auto-retrieve respects max_lines and max_bytes', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-auto-limit-'));
+  const memoryDir = path.join(base, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+  const snapFile = path.join(memoryDir, 'project_api.md');
+  fs.writeFileSync(snapFile, [
+    '---',
+    'name: api',
+    'categories: [api]',
+    'fingerprint: apiaaaaaaaaaaaa',
+    '---',
+    'api endpoint implementation details',
+    'line 2 with more details',
+    'line 3 should not be included',
+  ].join('\n'));
+
+  const cfg = configWithDirs({ memoryDir });
+  cfg.hooks.user_prompt_submit = {
+    warn_on: [],
+    auto_retrieve: { enabled: true, max_turns: 2, min_score: 0.01, scopes: ['project'], max_lines: 2, max_bytes: 40 },
+  };
+
+  const pipeMock = require('../pipeline.js');
+  const original = pipeMock.runAnalyze;
+  pipeMock.runAnalyze = () => ({
+    analysis: { userMessages: 1, messageCount: 1, filesModified: new Set(), decisions: [], failedAttempts: [], activeCategories: new Map(), lastNMessages: [] },
+    decision: { metrics: { contextPct: 10, contextTokens: 1000 }, level: 'comfortable' },
+    strategy: { compactPrompt: '/compact x' },
+    session: { path: '/tmp/fake', entries: [] },
+    entries: [],
+    modelId: 'x', sessionId: 'x', limits: {},
+  });
+
+  try {
+    const res = handleUserPromptSubmit({ cwd: '/tmp/auto-limit', session_id: 'x', prompt: 'api endpoint' }, cfg);
+    assert.ok(res.output, 'output produced');
+    assert.doesNotMatch(String(res.output), /line 3 should not be included/);
+    assert.match(String(res.output), /truncated by ctx/);
+  } finally {
+    pipeMock.runAnalyze = original;
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test('pre-tool-use writes structured single-line log entry', () => {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-log-'));
   const origHome = process.env.HOME;

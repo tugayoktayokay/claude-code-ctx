@@ -61,6 +61,16 @@
       "sweep_probability": 0.05
     }
   },
+  "mcp": {
+    "inline_limit_bytes": 2500,
+    "cache_get_default_limit": 2500,
+    "cache_get_max_limit": 8000,
+    "summary": {
+      "head_lines": 12,
+      "tail_lines": 6,
+      "max_line_len": 220
+    }
+  },
   "working_memory": {
     "enabled": false,
     "min_dedup_size_bytes": 1024,
@@ -113,7 +123,7 @@
     "follow_symlinks": false
   },
   "hooks": {
-    "session_start": { "restore_latest": true, "max_bytes": 8192 },
+    "session_start": { "restore_latest": true, "max_bytes": 2048 },
     "stop":          { "snapshot_on": ["urgent", "critical"], "backup_on": ["critical"], "clipboard_compact_on": ["compact", "urgent", "critical"] },
     "pre_compact":   { "inject_guidance": true, "respect_user_input": true },
     "pre_tool_use": {
@@ -156,7 +166,9 @@
         "enabled": true,
         "max_turns": 2,
         "min_score": 0.3,
-        "scopes": ["project", "global"]
+        "scopes": ["project", "global"],
+        "max_lines": 8,
+        "max_bytes": 1600
       }
     }
   }

@@ -75,6 +75,28 @@ test('ctx_cache_get retrieves previously stored content', async () => {
   try { fs.unlinkSync(w.path); fs.unlinkSync(w.path + '.meta'); } catch {}
 });
 
+test('ctx_cache_get caps oversized requested chunks', async () => {
+  const cache = require('../mcp_cache.js');
+  const w = cache.writeCache('x'.repeat(20000));
+  const cfg = loadDefaults();
+  cfg.mcp.cache_get_max_limit = 1234;
+  const r = await getTool('ctx_cache_get').handler({ ref: w.ref, offset: 0, limit: 9000 }, { config: cfg });
+  assert.match(r, /returned=1234B/);
+  assert.match(r, /capped at 1234B/);
+  try { fs.unlinkSync(w.path); fs.unlinkSync(w.path + '.meta'); } catch {}
+});
+
+test('ctx_grep honors limit_bytes before summarizing', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-grep-'));
+  const p = path.join(tmp, 'a.txt');
+  fs.writeFileSync(p, Array.from({ length: 40 }, (_, i) => `needle line ${i}`).join('\n'));
+  try {
+    const r = await getTool('ctx_grep').handler({ pattern: 'needle', path: p, limit_bytes: 80 }, { config: loadDefaults() });
+    assert.match(r, /summarized/);
+    assert.match(r, /ref: [a-f0-9]{12}/);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('all tools have required schema fields', () => {
   for (const t of allTools()) {
     assert.ok(t.name, 'name');
@@ -121,6 +143,29 @@ test('ctx_recall_read returns error for unknown path', async () => {
     const tool = allTools3().find(t => t.name === 'ctx_recall_read');
     const res = await tool.handler({ path: '/nope.md', session_id: 'sid-x' }, { config: {} });
     assert.match(res, /no working memory record/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
+test('ctx_recall_read summarizes large cached content instead of returning it all', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-mcp-big-'));
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+  delete require.cache[require.resolve('../working_memory.js')];
+  delete require.cache[require.resolve('../mcp_tools.js')];
+  const wm = require('../working_memory.js');
+
+  try {
+    const content = Array.from({ length: 200 }, (_, i) => `row ${i}`).join('\n');
+    wm.recordRead('sid-big', '/big.md', content);
+
+    const { allTools: allTools4 } = require('../mcp_tools.js');
+    const tool = allTools4().find(t => t.name === 'ctx_recall_read');
+    const res = await tool.handler({ path: '/big.md', session_id: 'sid-big', limit_bytes: 100 }, { config: loadDefaults() });
+    assert.match(res, /summarized/);
+    assert.match(res, /ref: [a-f0-9]{12}/);
+    assert.match(res, /more lines omitted/);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     delete process.env.CTX_WORKING_MEMORY_DIR;

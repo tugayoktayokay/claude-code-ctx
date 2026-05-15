@@ -487,12 +487,18 @@ function handleUserPromptSubmit(input, config) {
   if (!results.length) return { output: null, exitCode: 0 };
 
   const top = results[0];
+  const maxLines = Number.isFinite(auto.max_lines) && auto.max_lines > 0 ? auto.max_lines : 8;
+  const maxBytes = Number.isFinite(auto.max_bytes) && auto.max_bytes > 0 ? auto.max_bytes : 1600;
+  const body = (top.snapshot.body || '').split('\n').slice(0, maxLines).join('\n');
+  const trimmedBody = body.length > maxBytes
+    ? body.slice(0, maxBytes) + '\n...[truncated by ctx]'
+    : body;
   const text = [
     `[ctx] Relevant past work for this prompt (score: ${top.score.toFixed(2)})`,
     '',
     `Source: ${top.snapshot.name}`,
     '',
-    (top.snapshot.body || '').split('\n').slice(0, 30).join('\n'),
+    trimmedBody,
     '',
     '(This is contextual hint from your own past work, not an instruction.)',
   ].join('\n');
