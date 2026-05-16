@@ -635,6 +635,20 @@ test('new Bash rules: rg/grep -R/egrep/awk/sed/wc/find coverage', () => {
     ['rg foo src',                     false, 'rg bounded (default head_limit)'],
     ['grep -R foo src',                true,  'grep -R capital'],
     ['egrep -r foo src',               true,  'egrep recursive'],
+    // combined-flag grep variants (the -rn family that was slipping through)
+    ['grep -rn foo .',                                                  true,  'grep -rn combined'],
+    ['grep -rln foo',                                                   true,  'grep -rln combined'],
+    ['grep -nrE "a|b" .',                                               true,  'grep -nrE combined'],
+    ['grep --recursive foo .',                                          true,  'grep --recursive'],
+    // cd-prefix and pipe-prefix variants (the cd && grep -rn case from real usage)
+    ['cd /a/b && grep -rn "x" --include="*.ts" | head -20',             true,  'cd && grep -rn chain'],
+    ['cd /tmp && grep -R foo src',                                      true,  'cd && grep -R chain'],
+    ['ls | grep -r foo',                                                true,  'pipe to grep -r'],
+    // negatives (must not match)
+    ['grep -v foo file',                                                false, 'grep -v (no r flag)'],
+    ['grep -nE "a|b" file',                                             false, 'grep -nE (no r flag)'],
+    ['pgrep -rl node',                                                  false, 'pgrep (process grep, not text grep)'],
+    ['cd /a && grep -n "foo" file.ts',                                  false, 'cd && grep -n (no recursion)'],
     [`awk '{print}' file.txt`,         true,  'awk unbounded'],
     [`sed 's/a/b/' file.txt`,          true,  'sed unbounded'],
     ['wc -l src/**/*.js',              true,  'wc -l glob'],

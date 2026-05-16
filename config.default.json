@@ -131,7 +131,7 @@
       "default_mode": "ask",
       "rules": [
         { "tool": "Bash", "match": "^\\s*find\\s+(?:-[LHP]\\s+)*[/~]\\S*(?![\\s\\S]*\\s--?(maxdepth|name|iname|type\\s+f)\\b)", "mode": "deny", "reason": "Unbounded filesystem traversal from root/home. Add -maxdepth N or -name PATTERN to scope, or use ctx_shell({command: \"find ...\"}) — full output cached, returns ~500B summary + ref." },
-        { "tool": "Bash", "match": "^\\s*grep\\s+-r(\\s+|$)",              "mode": "deny", "reason": "Recursive grep floods context. Use ctx_grep({pattern, path}) — inline if small, summary+ref if big. Drop-in replacement." },
+        { "tool": "Bash", "match": "\\b(?:e?grep)\\s+(?:-[A-Za-z]*[rR][A-Za-z]*\\b|--recursive\\b)", "mode": "deny", "reason": "Recursive grep floods context (works for combined flags like -rn/-rln and after cd && / pipes). Use ctx_grep({pattern, path}) — inline if small, summary+ref if big. Drop-in replacement." },
         { "tool": "Bash", "match": "^\\s*cat\\s+/var/log/",               "mode": "deny", "reason": "Log files are huge. Use ctx_read({path, limit_bytes: 5000}) for head/tail summary, or tail -n 200." },
         { "tool": "Bash", "match": "^\\s*du\\s+-a",                       "mode": "deny", "reason": "du -a lists every file. Use du -sh <path> for totals, or ctx_shell if you really need per-file." },
 
@@ -146,9 +146,7 @@
         { "tool": "Bash", "match": "^\\s*ps\\s+-ef(\\s|$)",               "reason": "Full process list is noisy. Use pgrep <name> or ps -ef | grep <pattern>." },
         { "tool": "Bash", "match": "^\\s*head\\s+-n\\s+\\d{4,}",          "reason": "head -n with 4+ digit count. Use ctx_read({path, limit_bytes: 5000})." },
         { "tool": "Bash", "match": "^\\s*tail\\s+-n\\s+\\d{4,}",          "reason": "tail -n with 4+ digit count. Use ctx_read or a smaller -n." },
-        { "tool": "Bash", "match": "^\\s*rg\\s+(?:.*\\s)?(-r|--recursive)(\\s|$)", "reason": "rg recursive is the same footgun as grep -r. Use ctx_grep({pattern, path}) — inline if small, summary+ref if big." },
-        { "tool": "Bash", "match": "^\\s*grep\\s+-R(\\s|$)", "reason": "grep -R (capital) is recursive. Use ctx_grep." },
-        { "tool": "Bash", "match": "^\\s*egrep\\s+-r(\\s|$)", "reason": "egrep -r same as grep -r. Use ctx_grep." },
+        { "tool": "Bash", "match": "\\brg\\s+(?:.*\\s)?(-r|--recursive)\\b", "reason": "rg recursive flag is a footgun (rg recurses by default). Use ctx_grep({pattern, path}) — inline if small, summary+ref if big." },
         { "tool": "Bash", "match": "^\\s*(awk|sed)\\s+['\"][^'\"]+['\"]\\s+[^-|]", "reason": "awk/sed over a file without a bounded pipeline can emit the full file. Pipe through head -N, or use ctx_read." },
         { "tool": "Bash", "match": "^\\s*wc\\s+-l\\s+[^|]*\\*", "reason": "wc -l on a glob can stat thousands. Scope to a subdir, or use ctx_shell for a summary." },
         { "tool": "Bash", "match": "^(?!.*-maxdepth)\\s*find\\s+\\.\\s.*-print", "reason": "find without -maxdepth prints everything. Add -maxdepth N or use ctx_shell." }
