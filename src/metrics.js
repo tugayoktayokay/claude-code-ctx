@@ -255,11 +255,17 @@ function withinRange(ts, now, rangeDays) {
 }
 
 function aggregateCache(records) {
-  let writes = 0, reads = 0, read_hits = 0, read_misses = 0;
+  let writes = 0, hint_writes = 0, auto_writes = 0, unknown_writes = 0;
+  let reads = 0, read_hits = 0, read_misses = 0;
   let gc_sweeps = 0, gc_evicted = 0, gc_bytes_freed = 0;
   for (const r of records) {
-    if (r.evType === 'cache-write') writes++;
-    else if (r.evType === 'cache-read') {
+    if (r.evType === 'cache-write') {
+      writes++;
+      const src = String(r.source || '');
+      if (src === 'post_tool') auto_writes++;
+      else if (src === 'mcp') hint_writes++;
+      else unknown_writes++;  // pre-0.8.11 entries; will age out of 7d window
+    } else if (r.evType === 'cache-read') {
       reads++;
       if (r.result === 'hit') read_hits++;
       else if (r.result === 'miss') read_misses++;
@@ -270,8 +276,12 @@ function aggregateCache(records) {
     }
   }
   const hit_rate = reads ? read_hits / reads : 0;
-  const utilization_rate = writes ? read_hits / writes : 0;
-  return { writes, reads, read_hits, read_misses, hit_rate, utilization_rate, gc_sweeps, gc_evicted, gc_bytes_freed };
+  // utilization_rate denominator is hint_writes only — auto-written entries
+  // (post_tool hook bulk-caching every Bash output) are never surfaced to
+  // Claude, so they cannot be "recalled" and would otherwise dilute the rate.
+  // unknown entries (pre-0.8.11) are also excluded; they age out within 7d.
+  const utilization_rate = hint_writes ? read_hits / hint_writes : 0;
+  return { writes, hint_writes, auto_writes, unknown_writes, reads, read_hits, read_misses, hit_rate, utilization_rate, gc_sweeps, gc_evicted, gc_bytes_freed };
 }
 
 function aggregateWorkingMemory(records) {

@@ -78,16 +78,16 @@ test('doctor warns when enabled working_memory is not reachable from plugin mani
 test('doctor warns when runtime metrics show enabled features are unused', () => {
   const hooksLog = [
     '2026-05-18T10:00:00.000Z pre_tool session=S action=deny tool=Bash pattern="^grep" cmd_head="grep -r foo ." reason="recursive"',
-    '2026-05-18T10:01:00.000Z cache-write ref=aaa bytes=5000',
-    '2026-05-18T10:02:00.000Z cache-write ref=bbb bytes=6000',
-    '2026-05-18T10:03:00.000Z cache-write ref=ccc bytes=7000',
-    '2026-05-18T10:04:00.000Z cache-write ref=ddd bytes=8000',
-    '2026-05-18T10:05:00.000Z cache-write ref=eee bytes=9000',
-    '2026-05-18T10:06:00.000Z cache-write ref=fff bytes=10000',
-    '2026-05-18T10:07:00.000Z cache-write ref=ggg bytes=11000',
-    '2026-05-18T10:08:00.000Z cache-write ref=hhh bytes=12000',
-    '2026-05-18T10:09:00.000Z cache-write ref=iii bytes=13000',
-    '2026-05-18T10:10:00.000Z cache-write ref=jjj bytes=14000',
+    '2026-05-18T10:01:00.000Z cache-write ref=aaa bytes=5000 source=mcp',
+    '2026-05-18T10:02:00.000Z cache-write ref=bbb bytes=6000 source=mcp',
+    '2026-05-18T10:03:00.000Z cache-write ref=ccc bytes=7000 source=mcp',
+    '2026-05-18T10:04:00.000Z cache-write ref=ddd bytes=8000 source=mcp',
+    '2026-05-18T10:05:00.000Z cache-write ref=eee bytes=9000 source=mcp',
+    '2026-05-18T10:06:00.000Z cache-write ref=fff bytes=10000 source=mcp',
+    '2026-05-18T10:07:00.000Z cache-write ref=ggg bytes=11000 source=mcp',
+    '2026-05-18T10:08:00.000Z cache-write ref=hhh bytes=12000 source=mcp',
+    '2026-05-18T10:09:00.000Z cache-write ref=iii bytes=13000 source=mcp',
+    '2026-05-18T10:10:00.000Z cache-write ref=jjj bytes=14000 source=mcp',
   ].join('\n');
   withDoctorFixture(['Bash', 'Read'], (doctor) => {
     const rows = doctor.checkRuntimeDrift();
@@ -116,10 +116,10 @@ test('doctor warns when installed plugin version differs from source version', (
 test('doctor drift thresholds honor config.doctor.drift overrides', () => {
   // 4 cache writes — below default min (10), would be silent. Lower threshold to 3 → warn fires.
   const hooksLog = [
-    '2026-05-18T10:00:00.000Z cache-write ref=a bytes=5000',
-    '2026-05-18T10:01:00.000Z cache-write ref=b bytes=5000',
-    '2026-05-18T10:02:00.000Z cache-write ref=c bytes=5000',
-    '2026-05-18T10:03:00.000Z cache-write ref=d bytes=5000',
+    '2026-05-18T10:00:00.000Z cache-write ref=a bytes=5000 source=mcp',
+    '2026-05-18T10:01:00.000Z cache-write ref=b bytes=5000 source=mcp',
+    '2026-05-18T10:02:00.000Z cache-write ref=c bytes=5000 source=mcp',
+    '2026-05-18T10:03:00.000Z cache-write ref=d bytes=5000 source=mcp',
   ].join('\n');
   withDoctorFixture(['Bash', 'Read'], (doctor) => {
     const rows = doctor.checkRuntimeDrift();

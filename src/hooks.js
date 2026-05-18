@@ -438,7 +438,7 @@ async function handlePostToolUse(input, config) {
           const combined = stderr ? `${stdout}\n--- stderr ---\n${stderr}` : stdout;
           if (combined.length > 0) {
             const cache = require('./mcp_cache.js');
-            const cached = cache.writeCache(combined, { gc: (config && config.cache && config.cache.gc) || {} });
+            const cached = cache.writeCache(combined, { gc: (config && config.cache && config.cache.gc) || {}, source: 'post_tool' });
             wm.recordBashCall(sidBash, cmd, cwd, combined, {
               exit: tr3?.interrupted ? 124 : 0,
               ref: cached.ref,

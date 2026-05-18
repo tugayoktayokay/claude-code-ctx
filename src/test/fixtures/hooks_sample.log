@@ -33,7 +33,7 @@
 
 this line is not valid and should be skipped by the parser
 
-2026-04-21T10:12:00.000Z cache-write ref=a1b2c3d4e5f6 bytes=45312
+2026-04-21T10:12:00.000Z cache-write ref=a1b2c3d4e5f6 bytes=45312 source=mcp
 2026-04-21T10:12:10.000Z cache-read ref=a1b2c3d4e5f6 result=hit bytes=4000
 2026-04-21T10:12:20.000Z cache-read ref=deadbeef0000 result=miss bytes=0
 2026-04-21T10:13:00.000Z cache-gc swept=3 bytes_freed=81788928

@@ -321,11 +321,18 @@ function printMetrics(r) {
     console.log('');
   }
   if (r.cache && (r.cache.writes || r.cache.reads || r.cache.gc_sweeps)) {
+    const hintWrites = r.cache.hint_writes ?? r.cache.writes ?? 0;
+    const autoWrites = r.cache.auto_writes || 0;
+    const unknownWrites = r.cache.unknown_writes || 0;
     console.log(C.dim + `  cache (last ${r.range_days}d):` + C.reset);
-    console.log(`    writes:   ${r.cache.writes}`);
+    const breakdownParts = [];
+    if (autoWrites) breakdownParts.push(`${autoWrites} auto post_tool`);
+    if (unknownWrites) breakdownParts.push(`${unknownWrites} pre-0.8.11`);
+    const breakdown = breakdownParts.length ? `  (excluded: ${breakdownParts.join(', ')})` : '';
+    console.log(`    writes:   ${hintWrites} recallable${breakdown}`);
     console.log(`    reads:    ${r.cache.reads} (${r.cache.read_hits} hits, ${r.cache.read_misses} misses — ${Math.round(100 * r.cache.hit_rate)}% hit rate)`);
-    if (r.cache.writes) {
-      console.log(`    reuse:    ${Math.round(100 * (r.cache.utilization_rate || 0))}% (${r.cache.read_hits} hit reads / ${r.cache.writes} writes)`);
+    if (hintWrites) {
+      console.log(`    reuse:    ${Math.round(100 * (r.cache.utilization_rate || 0))}% (${r.cache.read_hits} hit reads / ${hintWrites} recallable writes)`);
     }
     if (r.cache.gc_sweeps) {
       const mb = Math.round(r.cache.gc_bytes_freed / 1024 / 1024);

@@ -260,8 +260,9 @@ function checkRuntimeDrift() {
   }
 
   const cache = record.cache || {};
-  if ((cache.writes || 0) >= t.cache_min_writes && (cache.read_hits || 0) === 0) {
-    out.push({ ...CHECKS.warn, label: 'Cache reuse', detail: `${cache.writes} writes but 0 hit reads in last ${t.range_days}d — ctx_cache_get guidance is not being followed` });
+  const hintWrites = cache.hint_writes ?? cache.writes ?? 0;
+  if (hintWrites >= t.cache_min_writes && (cache.read_hits || 0) === 0) {
+    out.push({ ...CHECKS.warn, label: 'Cache reuse', detail: `${hintWrites} recallable writes but 0 hit reads in last ${t.range_days}d — ctx_cache_get guidance is not being followed` });
   }
 
   if (!out.length) {

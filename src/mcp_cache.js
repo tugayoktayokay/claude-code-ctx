@@ -34,7 +34,12 @@ function writeCache(content, opts = {}, deps = {}) {
   fs.writeFileSync(filePath, content);
   const expiresAt = Date.now() + (opts.ttlMs || 24 * 3600 * 1000);
   fs.writeFileSync(filePath + '.meta', JSON.stringify({ expiresAt, size: content.length }));
-  logCacheEvent(`cache-write ref=${hash} bytes=${content.length}`);
+  // source tags whether this write produced a hint Claude can see (`mcp`) or
+  // is an auto-cache from the post_tool hook with no surfaced ref (`post_tool`).
+  // utilization metrics divide hits by `mcp` writes only — counting post_tool
+  // auto-writes as the denominator makes the rate look ~10x worse than reality.
+  const source = String(opts.source || 'mcp');
+  logCacheEvent(`cache-write ref=${hash} bytes=${content.length} source=${source}`);
   return { ref: hash, path: filePath, size: content.length, expiresAt };
 }
 

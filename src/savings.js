@@ -48,13 +48,22 @@ function estimateSavings(logPath = path.join(os.homedir(), '.config', 'ctx', 'ho
 
 function formatSavings(s) {
   const lines = [];
+  const hintWrites = s.cache?.hint_writes ?? s.cache?.writes ?? 0;
+  const autoWrites = s.cache?.auto_writes || 0;
+  const unknownWrites = s.cache?.unknown_writes || 0;
   lines.push('');
   lines.push(`  ctx savings — last ${s.range_days} days`);
   lines.push('');
   lines.push(`  estimated saved: ${s.total_saved_tokens.toLocaleString()} tokens`);
-  lines.push(`    cache reuse:    ${s.cache_saved_tokens.toLocaleString()} tokens (${s.cache?.read_hits || 0} hit reads / ${s.cache?.writes || 0} writes)`);
+  lines.push(`    cache reuse:    ${s.cache_saved_tokens.toLocaleString()} tokens (${s.cache?.read_hits || 0} hit reads / ${hintWrites} recallable writes)`);
+  if (autoWrites || unknownWrites) {
+    const breakdown = [];
+    if (autoWrites) breakdown.push(`${autoWrites} auto post_tool`);
+    if (unknownWrites) breakdown.push(`${unknownWrites} pre-0.8.11`);
+    lines.push(`      (excluded from rate: ${breakdown.join(', ')})`);
+  }
   lines.push(`    working memory: ${s.wm_saved_tokens.toLocaleString()} tokens (${(s.working_memory?.dedup_hits || 0) + (s.working_memory?.bash_dedup_hits || 0)} dedup hits)`);
-  if ((s.cache?.writes || 0) > 0) {
+  if (hintWrites > 0) {
     lines.push(`    cache reuse rate: ${Math.round(100 * (s.cache?.utilization_rate || 0))}%`);
   }
   lines.push('');

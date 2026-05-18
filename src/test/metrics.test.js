@@ -337,6 +337,24 @@ test('aggregate excludes events outside range', () => {
   assert.equal(r.cache.writes, 0);
 });
 
+test('aggregateCache splits writes by source; utilization excludes post_tool auto-writes', () => {
+  const records = [
+    { evType: 'cache-write', ref: 'a', bytes: '1000', source: 'mcp' },
+    { evType: 'cache-write', ref: 'b', bytes: '500',  source: 'post_tool' },
+    { evType: 'cache-write', ref: 'c', bytes: '500',  source: 'post_tool' },
+    { evType: 'cache-write', ref: 'd', bytes: '500' },  // pre-0.8.11, no source
+    { evType: 'cache-read',  ref: 'a', result: 'hit', bytes: '1000' },
+  ];
+  const c = aggregateCache(records);
+  assert.equal(c.writes, 4);
+  assert.equal(c.hint_writes, 1, 'only mcp-tagged writes count as hint-bearing');
+  assert.equal(c.auto_writes, 2);
+  assert.equal(c.unknown_writes, 1);
+  assert.equal(c.read_hits, 1);
+  // utilization = 1 hit / 1 hint_write = 100% (was 1/4 = 25% with old logic)
+  assert.equal(c.utilization_rate, 1);
+});
+
 test('aggregate with empty log returns zero record, no division by zero', () => {
   const emptyPath = path.join(__dirname, 'fixtures', 'empty.log');
   require('fs').writeFileSync(emptyPath, '');

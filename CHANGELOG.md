@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.11] — 2026-05-18
+
+### Fixed
+- **Cache reuse metric had the wrong denominator.** Every Bash post_tool hook auto-cached its output regardless of size — so the `cache writes` count was ~10x inflated by entries Claude never saw a ref for. The reported `cache reuse rate: 1%` was actually closer to ~20% on the recallable subset.
+- `cache-write` log lines now carry a `source=mcp|post_tool` tag:
+  - `source=mcp` — written by `ctx_shell` / `ctx_read` / `ctx_grep` when output exceeded the inline limit. Claude received a "Recall via: ctx_cache_get(...)" hint.
+  - `source=post_tool` — written by the Bash post-tool hook, no hint surfaced. Excluded from the reuse rate calculation.
+  - Pre-0.8.11 entries lack the tag; they become `unknown_writes` and are also excluded. They age out of the 7-day window naturally.
+- `ctx savings` and `ctx metrics` now report `<N> recallable writes` (and break down auto/unknown counts separately) so the rate matches the surface Claude can actually see.
+
+### Added
+- New `aggregateCache` fields: `hint_writes`, `auto_writes`, `unknown_writes`.
+- Regression test asserting source-aware splitting and that auto-writes do not dilute the utilization rate.
+
 ## [v0.8.10] — 2026-05-18
 
 ### Fixed
@@ -92,7 +106,8 @@ Highlights across the 0.7 line:
 
 Earlier releases are documented in commit history.
 
-[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.10...HEAD
+[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.11...HEAD
+[v0.8.11]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.10...v0.8.11
 [v0.8.10]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.9...v0.8.10
 [v0.8.9]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.8...v0.8.9
 [v0.8.7]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.6...v0.8.7
