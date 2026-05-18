@@ -386,8 +386,12 @@ const wrapperTools = [
       } catch (err) {
         return okText(`error: rg not available (${err.message})`);
       }
-      if (result.error) {
-        const grep = spawnSync('grep', ['-rn', '-m', String(maxResults), pattern, searchPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, timeout: 20000 });
+      // rg missing → fall back to GNU grep with -E so alternation (a|b|c) and
+      // grouping (foo|bar) work as users (and rg's default mode) expect.
+      // Without -E, grep treats `|` literally and silently returns no matches,
+      // which masquerades as "ctx_grep is broken" when the pattern is fine.
+      if (result.error || (result.status === null && !result.stdout && !result.stderr)) {
+        const grep = spawnSync('grep', ['-rEn', '-m', String(maxResults), pattern, searchPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024, timeout: 20000 });
         result = grep;
       }
 

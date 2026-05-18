@@ -197,6 +197,28 @@ test('correlate: ctx_cache_get is bystander (NOT in the obey bucket)', () => {
   assert.equal(r.pre_tool.deny.abandoned, 1);
 });
 
+test('correlate: deny + direct Read within 30s → obeyed (alt-tool fallback)', () => {
+  // Real-world pattern from FitCrate: Claude denied on recursive grep, then
+  // read the target file directly instead. That is rational obey, not abandon.
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:03.000Z', session: 'S', tool: 'Read', exit: '-' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 1, 'Read within 30s of deny counts as obeyed');
+  assert.equal(r.pre_tool.deny.abandoned, 0);
+});
+
+test('correlate: deny + Read beyond 30s window → abandoned (avoids false attribution)', () => {
+  const records = [
+    { evType: 'pre_tool', ts: '2026-04-21T10:00:00.000Z', session: 'S', action: 'deny', tool: 'Bash', pattern: '^grep' },
+    { evType: 'post_tool', ts: '2026-04-21T10:00:45.000Z', session: 'S', tool: 'Read', exit: '-' },
+  ];
+  const r = correlate(records);
+  assert.equal(r.pre_tool.deny.obeyed, 0);
+  assert.equal(r.pre_tool.deny.abandoned, 1);
+});
+
 test('correlate: Bash post with exit="-" (unknown) matching pattern → indeterminate, not bypassed', () => {
   // exit="-" happens when tool_response had neither stdout/stderr nor content
   // (e.g. interrupted before output). We can't tell if the command actually ran,

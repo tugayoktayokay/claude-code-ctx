@@ -180,14 +180,41 @@ function splitShellArgs(s) {
   return out;
 }
 
+// grep flags that consume the next arg as a value (so the value is NOT the
+// search pattern). Mirrors GNU grep + macOS BSD grep flag set.
+const GREP_VALUE_FLAGS = new Set([
+  '-m', '-A', '-B', '-C', '-e', '-f', '--include', '--exclude',
+  '--exclude-dir', '--include-dir', '--max-count', '--after-context',
+  '--before-context', '--context', '--file', '--regexp',
+]);
+
+function pickPositional(args, fromIndex = 0) {
+  let i = fromIndex;
+  while (i < args.length) {
+    const a = args[i];
+    if (!a) { i++; continue; }
+    if (a.startsWith('-')) {
+      // strip =value form for value-flag detection
+      const flagName = a.split('=')[0];
+      if (GREP_VALUE_FLAGS.has(flagName) && !a.includes('=')) {
+        i += 2; // skip flag + its value
+      } else {
+        i += 1; // boolean flag
+      }
+      continue;
+    }
+    return { value: a, nextIndex: i + 1 };
+  }
+  return { value: null, nextIndex: args.length };
+}
+
 function recursiveGrepExample(cmd) {
   const m = String(cmd || '').match(/\b(?:e?grep)\s+(-[A-Za-z]*[rR][A-Za-z]*|--recursive)\s+(.+?)(?:\s+\||\s+2>&1|$)/);
   if (!m) return null;
   const args = splitShellArgs(m[2]);
-  const pattern = args.find(a => a && !a.startsWith('-')) || 'PATTERN';
-  const afterPattern = args.slice(args.indexOf(pattern) + 1);
-  const path = afterPattern.find(a => a && !a.startsWith('-')) || '.';
-  return `ctx_grep({pattern: ${JSON.stringify(pattern)}, path: ${JSON.stringify(path)}, limit_bytes: 2500})`;
+  const { value: pattern, nextIndex } = pickPositional(args);
+  const { value: pathArg } = pickPositional(args, nextIndex);
+  return `ctx_grep({pattern: ${JSON.stringify(pattern || 'PATTERN')}, path: ${JSON.stringify(pathArg || '.')}, limit_bytes: 2500})`;
 }
 
 function guidanceForRule(rule, toolInput = {}) {

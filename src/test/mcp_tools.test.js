@@ -97,6 +97,22 @@ test('ctx_grep honors limit_bytes before summarizing', async () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
+test('ctx_grep alternation pattern works (regression: rg-missing fallback used -E)', async () => {
+  // FitCrate trace bug: machines without rg fell back to plain grep -rn,
+  // which treats `|` literally — so `TODO|FIXME|XXX` returned zero matches.
+  // Fixed by adding -E to the grep fallback.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-grep-alt-'));
+  const p = path.join(tmp, 'sample.ts');
+  fs.writeFileSync(p, '// TODO: a\nconst x=1;\n// FIXME: b\n// XXX: c\n');
+  try {
+    const r = await getTool('ctx_grep').handler({ pattern: 'TODO|FIXME|XXX', path: tmp }, { config: loadDefaults() });
+    assert.match(r, /TODO/);
+    assert.match(r, /FIXME/);
+    assert.match(r, /XXX/);
+    assert.doesNotMatch(r, /no matches/);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
 test('all tools have required schema fields', () => {
   for (const t of allTools()) {
     assert.ok(t.name, 'name');

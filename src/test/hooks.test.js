@@ -1164,3 +1164,20 @@ test('recursiveGrepExample dynamically constructs ctx_grep call from real comman
   assert.match(out, /ctx_grep\(\{pattern: "AsyncStorage", path: "apps\/mobile\/store\/"/);
 });
 
+test('recursiveGrepExample skips value-taking grep flags when picking pattern/path', () => {
+  const { recursiveGrepExample } = require('../hooks.js');
+  // Regression: previously `-m 100 "TODO|FIXME"` made "100" look like the pattern.
+  assert.match(
+    recursiveGrepExample('grep -rEn -m 100 "TODO|FIXME" /tmp'),
+    /pattern: "TODO\|FIXME", path: "\/tmp"/,
+  );
+  assert.match(
+    recursiveGrepExample('grep -rn --include="*.ts" "foo" /apps'),
+    /pattern: "foo", path: "\/apps"/,
+  );
+  assert.match(
+    recursiveGrepExample('grep -r -A 3 -B 2 "pattern" /path'),
+    /pattern: "pattern", path: "\/path"/,
+  );
+});
+

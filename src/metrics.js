@@ -94,7 +94,14 @@ function parseLog(input) {
 // - Direct MCP (if user adds to .mcp.json): "mcp__ctx__ctx_grep"
 // Both forms must match so metrics work regardless of install method.
 const CTX_MCP_TOOL_RE = /^mcp__(?:plugin_claude-code-ctx_)?ctx__ctx_(grep|read|shell)$/;
+// Tools that count as "obey via alternative" — Claude skipped the redirected
+// command and went straight to file inspection. This is rational behavior
+// (e.g. deny on `grep -r feedback` → Read services/feedback.ts directly), so
+// classify it as obey rather than abandon. Excludes Bash and ctx_* (handled
+// separately) plus pure metadata tools (TodoWrite, Task).
+const OBEY_ALT_TOOLS = new Set(['Read', 'Edit', 'MultiEdit', 'Write', 'Glob']);
 const WINDOW_SECONDS_DEFAULT = 60;
+const ALT_TOOL_WINDOW_SECONDS = 30;
 
 function toMs(ts) { return Date.parse(ts); }
 
@@ -163,12 +170,16 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         if (dt > windowSeconds) break;
         const isBashPost = post.tool === 'Bash';
         const isCtxPost  = CTX_MCP_TOOL_RE.test(post.tool || '');
-        if (!isBashPost && !isCtxPost) continue; // bystander — skip
+        const isAltPost  = OBEY_ALT_TOOLS.has(post.tool || '');
+        if (!isBashPost && !isCtxPost && !isAltPost) continue; // bystander — skip
         // Bash that doesn't match the rule's pattern is also a bystander: the
         // user likely ran an unrelated command while Claude was about to obey
         // via ctx_*. Only a Bash call matching the pattern proves the rule
         // was bypassed.
         if (isBashPost && !bashMatchesPattern(pre.pattern, post.cmd_head)) continue;
+        // Alt tools (Read/Edit/...) only count as obey within a tighter window
+        // to avoid attributing unrelated reads to the deny.
+        if (isAltPost && dt > ALT_TOOL_WINDOW_SECONDS) continue;
         closed.add(j);
         // exit='-' means unknown — tool_response had neither stdout/stderr nor content
         // (e.g. interrupted before producing output, non-standard payload). Classify
@@ -183,6 +194,8 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         } else if (isBashPost && !exitKnown) {
           classification = 'indeterminate';
         } else if (isCtxPost) {
+          classification = pre.action === 'deny' ? 'obeyed' : 'redirected';
+        } else if (isAltPost) {
           classification = pre.action === 'deny' ? 'obeyed' : 'redirected';
         }
         break;

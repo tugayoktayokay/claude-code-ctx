@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.9] — 2026-05-18
+
+### Fixed
+- **ctx_grep alternation silently returned 0 matches** on machines without `rg`. The grep fallback used plain `-rn`, which treats `|` literally — so patterns like `TODO|FIXME|XXX`, `console.(log|error)`, or `as any|as never` were always reported as "no matches" even when the targets existed. Discovered while tracing FitCrate session: 5 consecutive ctx_grep calls returned 48 bytes (empty marker). Fallback now uses `grep -rEn` so extended regex (alternation, grouping) works as users expect.
+- **`recursiveGrepExample` mis-identified pattern when grep had value-taking flags** (`-m N`, `-A N`, `-B N`, `--include=...`). Example: `grep -rn -m 100 "TODO|FIXME" /tmp` produced a deny example of `ctx_grep({pattern: "100", path: "TODO|FIXME"})`. Now flag/value pairs are skipped via an explicit `GREP_VALUE_FLAGS` set.
+- **Metric obey detection mis-classified rational fallbacks as abandoned.** When Claude denied on `grep -r feedback` and read `services/feedback.ts` directly within seconds, the metric called it "abandoned." That is obey behavior, not abandonment. Added `OBEY_ALT_TOOLS` (Read/Edit/Write/MultiEdit/Glob) within a 30-second window; these now count as `obeyed` for deny and `redirected` for ask. Bash-matching-pattern still classifies as `bypassed`; unrelated Bash is still a bystander.
+
 ## [v0.8.8] — 2026-05-18
 
 ### Added
@@ -79,7 +86,8 @@ Highlights across the 0.7 line:
 
 Earlier releases are documented in commit history.
 
-[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.7...HEAD
+[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.9...HEAD
+[v0.8.9]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.8...v0.8.9
 [v0.8.7]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.6...v0.8.7
 [v0.8.6]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.5...v0.8.6
 [v0.8.5]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.4...v0.8.5
