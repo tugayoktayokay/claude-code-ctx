@@ -95,6 +95,16 @@
       ]
     }
   },
+  "doctor": {
+    "drift": {
+      "deny_min_total": 5,
+      "deny_obey_threshold": 0.5,
+      "ask_min_total": 5,
+      "ask_cancel_threshold": 0.5,
+      "cache_min_writes": 10,
+      "range_days": 7
+    }
+  },
   "backup": {
     "enabled": true,
     "dir": "~/.config/ctx/backups",

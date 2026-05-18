@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.7.x (memory engine, BM25 search, auto-retrieval)
+
 **Goal:** Turn ctx's pasif snapshot arşivini, aranabilir ve Claude Code'a otomatik enjekte edilen bir dev hafıza motoruna dönüştürmek.
 
 **Architecture:** Saf fonksiyonel modüller (query, retrieval, notes, timeline, diff, stats) + mevcut snapshot/hook/cli'ye eklemeler. Ranking = keyword + kategori + tazelik hibrid formülü. İndex yok — scan-on-query. Zero deps, no LLM.

@@ -166,9 +166,17 @@ function handlePreCompact(input, config) {
 }
 
 function splitShellArgs(s) {
+  // Order matters: $(...) and `...` must match before the bare-word fallback
+  // so `grep "$(cat patterns.txt)" .` keeps the subshell as a single token.
   const out = [];
-  const re = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
-  for (const m of String(s || '').matchAll(re)) out.push(m[1] ?? m[2] ?? m[3]);
+  const re = /\$\(([^()]*)\)|`([^`]*)`|"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  for (const m of String(s || '').matchAll(re)) {
+    if (m[1] !== undefined) out.push('$(' + m[1] + ')');
+    else if (m[2] !== undefined) out.push('`' + m[2] + '`');
+    else if (m[3] !== undefined) out.push(m[3]);
+    else if (m[4] !== undefined) out.push(m[4]);
+    else out.push(m[5]);
+  }
   return out;
 }
 
@@ -590,4 +598,7 @@ module.exports = {
   readStdin,
   safeParse,
   logHook,
+  // exposed for tests
+  splitShellArgs,
+  recursiveGrepExample,
 };

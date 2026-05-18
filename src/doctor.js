@@ -180,10 +180,29 @@ function checkFeatureWiring() {
   return out;
 }
 
+const DRIFT_DEFAULTS = {
+  deny_min_total: 5,
+  deny_obey_threshold: 0.5,
+  ask_min_total: 5,
+  ask_cancel_threshold: 0.5,
+  cache_min_writes: 10,
+  range_days: 7,
+};
+
+function driftThresholds(config) {
+  const cfg = config?.doctor?.drift || {};
+  const out = {};
+  for (const k of Object.keys(DRIFT_DEFAULTS)) {
+    out[k] = Number.isFinite(cfg[k]) ? cfg[k] : DRIFT_DEFAULTS[k];
+  }
+  return out;
+}
+
 function checkRuntimeDrift() {
   const out = [];
   let config;
   try { config = loadConfig(); } catch { return out; }
+  const t = driftThresholds(config);
 
   if (!fs.existsSync(HOOKS_LOG_FILE)) {
     out.push({ ...CHECKS.info, label: 'Runtime drift', detail: 'hooks.log not created yet' });
@@ -193,7 +212,7 @@ function checkRuntimeDrift() {
   let record;
   try {
     const metrics = require('./metrics.js');
-    record = metrics.aggregate(HOOKS_LOG_FILE, { now: Date.now(), rangeDays: 7 });
+    record = metrics.aggregate(HOOKS_LOG_FILE, { now: Date.now(), rangeDays: t.range_days });
   } catch (err) {
     out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: `metrics unavailable: ${err.message}` });
     return out;
@@ -202,22 +221,22 @@ function checkRuntimeDrift() {
   const wm = record.working_memory || {};
   const wmEvents = (wm.dedup_hits || 0) + (wm.recall_calls || 0) + (wm.bash_dedup_hits || 0);
   if (config?.working_memory?.enabled && record.pre_tool?.total > 0 && wmEvents === 0) {
-    out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: 'working_memory enabled but no working_memory events in last 7d' });
+    out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: `working_memory enabled but no working_memory events in last ${t.range_days}d` });
   }
 
   const deny = record.pre_tool?.deny || {};
-  if ((deny.total || 0) >= 5 && (deny.obeyed || 0) / deny.total < 0.5) {
-    out.push({ ...CHECKS.warn, label: 'Deny obey rate', detail: `${deny.obeyed}/${deny.total} obeyed in last 7d — deny guidance may be too vague` });
+  if ((deny.total || 0) >= t.deny_min_total && (deny.obeyed || 0) / deny.total < t.deny_obey_threshold) {
+    out.push({ ...CHECKS.warn, label: 'Deny obey rate', detail: `${deny.obeyed}/${deny.total} obeyed in last ${t.range_days}d — deny guidance may be too vague` });
   }
 
   const ask = record.pre_tool?.ask || {};
-  if ((ask.total || 0) >= 5 && (ask.canceled || 0) / ask.total > 0.5) {
-    out.push({ ...CHECKS.warn, label: 'Ask cancel rate', detail: `${ask.canceled}/${ask.total} canceled in last 7d — inspect top canceled rules` });
+  if ((ask.total || 0) >= t.ask_min_total && (ask.canceled || 0) / ask.total > t.ask_cancel_threshold) {
+    out.push({ ...CHECKS.warn, label: 'Ask cancel rate', detail: `${ask.canceled}/${ask.total} canceled in last ${t.range_days}d — inspect top canceled rules` });
   }
 
   const cache = record.cache || {};
-  if ((cache.writes || 0) >= 10 && (cache.read_hits || 0) === 0) {
-    out.push({ ...CHECKS.warn, label: 'Cache reuse', detail: `${cache.writes} writes but 0 hit reads in last 7d — ctx_cache_get guidance is not being followed` });
+  if ((cache.writes || 0) >= t.cache_min_writes && (cache.read_hits || 0) === 0) {
+    out.push({ ...CHECKS.warn, label: 'Cache reuse', detail: `${cache.writes} writes but 0 hit reads in last ${t.range_days}d — ctx_cache_get guidance is not being followed` });
   }
 
   if (!out.length) {

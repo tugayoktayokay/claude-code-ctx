@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.7.x (BM25 cache persistent at ~/.config/ctx/bm25_cache/)
+
 **Goal:** Add a persistent, per-project gzipped JSON cache of tokenized snapshot bodies so `rank()` only retokenizes files whose mtime changed since the last query.
 
 **Architecture:** Additive. Existing BM25 logic untouched. New cache I/O layer in `src/retrieval.js`. Cache at `~/.config/ctx/bm25/<encoded_cwd>.json.gz`, gzip+atomic write (mirroring `backup.js` pattern). On load failure, treat as miss and rebuild from disk.

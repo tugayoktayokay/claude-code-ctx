@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.8.0 (Bash dedup with time-windowed allowlist)
+
 **Goal:** Add Bash tool-call dedup. When Claude runs a read-only or state-probe command (grep, find, ls, cat, git status, etc.) twice within a short window (60s for fs reads, 30s for state probes), the second call is intercepted by PreToolUse and replaced with a deny+redirect that points to a cached `ctx_cache_get({ref})`.
 
 **Architecture:** Extend Phase 1's `working_memory.js` module with `recordBashCall()`, `lookupLatestBashCall()`, `bashDedupDecision()`. Per-session state at `~/.config/ctx/working_memory/<sid>.json` gains a new `bash_calls` field keyed by `<cwd>|<cmd_norm>`. Output blobs go through the existing `mcp_cache.js`, no new storage. Two independent enable flags: `working_memory.enabled` (Phase 1) and `working_memory.bash_dedup.enabled` (Phase 2).

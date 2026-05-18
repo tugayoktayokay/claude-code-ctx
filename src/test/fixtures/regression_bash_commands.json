@@ -1,0 +1,502 @@
+[
+  {
+    "label": "ctx --version",
+    "command": "ctx --version",
+    "expect": "pass"
+  },
+  {
+    "label": "git log --oneline -15 && echo \"---\" && git status",
+    "command": "git log --oneline -15 && echo \"---\" && git status",
+    "expect": "pass"
+  },
+  {
+    "label": "git show --stat 4ad2b37",
+    "command": "git show --stat 4ad2b37",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run list --branch main --limit 10 2>&1 | head -30",
+    "command": "gh run list --branch main --limit 10 2>&1 | head -30",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run view 24744655518 2>&1 | head -40",
+    "command": "gh run view 24744655518 2>&1 | head -40",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run view --job=72393557719 --log 2>&1 | tail -50",
+    "command": "gh run view --job=72393557719 --log 2>&1 | tail -50",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s -o /dev/null -w \"backend: %{http_code} (%{time_total}s)\n\" http",
+    "command": "curl -s -o /dev/null -w \"backend: %{http_code} (%{time_total}s)\n\" https://remas",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx doctor",
+    "command": "ctx doctor",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s -o /dev/null -w \"api root: %{http_code}\n\" https://remasterhr.c",
+    "command": "curl -s -o /dev/null -w \"api root: %{http_code}\n\" https://remasterhr.com/api; c",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s -o /dev/null -w \"%{http_code}  %{url_effective}\n\" -L https://r",
+    "command": "curl -s -o /dev/null -w \"%{http_code}  %{url_effective}\n\" -L https://remasterhr",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s https://remasterhr.com/ | grep -oE '(src|href)=\"[^\"]*\"' | head",
+    "command": "curl -s https://remasterhr.com/ | grep -oE '(src|href)=\"[^\"]*\"' | head -20; echo",
+    "expect": "pass"
+  },
+  {
+    "label": "wc -l \"/Users/tugayoktayokay/apps/Ik Kolay/frontend/src/pages/LinkedIn",
+    "command": "wc -l \"/Users/tugayoktayokay/apps/Ik Kolay/frontend/src/pages/LinkedInBrand.tsx\"",
+    "expect": "pass"
+  },
+  {
+    "label": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | ",
+    "command": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | tail -30",
+    "expect": "pass"
+  },
+  {
+    "label": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | ",
+    "command": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | tail -5",
+    "expect": "pass"
+  },
+  {
+    "label": "git status && echo \"---\" && git diff --stat",
+    "command": "git status && echo \"---\" && git diff --stat",
+    "expect": "pass"
+  },
+  {
+    "label": "pwd && git rev-parse --show-toplevel",
+    "command": "pwd && git rev-parse --show-toplevel",
+    "expect": "pass"
+  },
+  {
+    "label": "cd \"/Users/tugayoktayokay/apps/Ik Kolay\" && git add frontend/src/local",
+    "command": "cd \"/Users/tugayoktayokay/apps/Ik Kolay\" && git add frontend/src/locales/en.ts f",
+    "expect": "pass"
+  },
+  {
+    "label": "sleep 8 && gh run list --branch main --limit 1",
+    "command": "sleep 8 && gh run list --branch main --limit 1",
+    "expect": "pass"
+  },
+  {
+    "label": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | ",
+    "command": "cd \"/Users/tugayoktayokay/apps/Ik Kolay/frontend\" && pnpm lint 2>&1 | tail -10",
+    "expect": "pass"
+  },
+  {
+    "label": "cd \"/Users/tugayoktayokay/apps/Ik Kolay\" && git add frontend/src/pages",
+    "command": "cd \"/Users/tugayoktayokay/apps/Ik Kolay\" && git add frontend/src/pages/CVBuilder",
+    "expect": "pass"
+  },
+  {
+    "label": "sleep 6 && gh run list --branch main --limit 2",
+    "command": "sleep 6 && gh run list --branch main --limit 2",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx metrics",
+    "command": "ctx metrics",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git log --oneline -50 | gre",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git log --oneline -50 | grep -i -E \"c",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"Strength\\|güçlendi",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"Strength\\|güçlendir\\|improve",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -n \"crm-ext-banner\\|extension.*download\\|Chrome Web Store\" /Users",
+    "command": "grep -n \"crm-ext-banner\\|extension.*download\\|Chrome Web Store\" /Users/tugayokta",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"handleFixCV\\|setSh",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"handleFixCV\\|setShowQuestion",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"parse.*CV\\|parse.*",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"parse.*CV\\|parse.*cv\\|extrac",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && find backend/src/routes -na",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && find backend/src/routes -name \"*.ts\" ",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"fix-questions\\|/fi",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -n \"fix-questions\\|/fix'\" backen",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -n \"extBannerDismissed\\|dismissExtBanner\" /Users/tugayoktayokay/a",
+    "command": "grep -n \"extBannerDismissed\\|dismissExtBanner\" /Users/tugayoktayokay/apps/Ik\\ Ko",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -rn \"generateFixQuesti",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && grep -rn \"generateFixQuestions\\|fixCV",
+    "expect": "deny"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git log --oneline -15 -- \"f",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git log --oneline -15 -- \"frontend/sr",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx usage --tools --days 30",
+    "command": "ctx usage --tools --days 30",
+    "expect": "pass"
+  },
+  {
+    "label": "git status && git log --oneline -5 && git rev-parse --abbrev-ref HEAD",
+    "command": "git status && git log --oneline -5 && git rev-parse --abbrev-ref HEAD",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff frontend/src/pages/CareerCRM.tsx",
+    "command": "git diff frontend/src/pages/CareerCRM.tsx",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff --stat && echo \"---\" && git diff backend/src/routes/analysis.",
+    "command": "git diff --stat && echo \"---\" && git diff backend/src/routes/analysis.ts backend",
+    "expect": "pass"
+  },
+  {
+    "label": "git add frontend/src/pages/CareerCRM.tsx && git commit -m \"$(cat <<'EO",
+    "command": "git add frontend/src/pages/CareerCRM.tsx && git commit -m \"$(cat <<'EOF' fix(crm",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run list --limit 3",
+    "command": "gh run list --limit 3",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff frontend/src/pages/Report.tsx | head -120",
+    "command": "git diff frontend/src/pages/Report.tsx | head -120",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff frontend/src/pages/CVBuilder.tsx | head -80",
+    "command": "git diff frontend/src/pages/CVBuilder.tsx | head -80",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff backend/src/services/ai.service.ts | wc -l && git diff backen",
+    "command": "git diff backend/src/services/ai.service.ts | wc -l && git diff backend/src/serv",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff frontend/src/pages/CVBuilder.tsx | tail -60 && echo \"---\" && ",
+    "command": "git diff frontend/src/pages/CVBuilder.tsx | tail -60 && echo \"---\" && git diff f",
+    "expect": "pass"
+  },
+  {
+    "label": "git add backend/src/routes/analysis.ts backend/src/services/ai.service",
+    "command": "git add backend/src/routes/analysis.ts backend/src/services/ai.service.ts fronte",
+    "expect": "pass"
+  },
+  {
+    "label": "git status && echo \"---\" && gh run list --limit 3",
+    "command": "git status && echo \"---\" && gh run list --limit 3",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run list --limit 3 --json databaseId,displayTitle,status,conclusion",
+    "command": "gh run list --limit 3 --json databaseId,displayTitle,status,conclusion,url,creat",
+    "expect": "pass"
+  },
+  {
+    "label": "until [ \"$(gh run list --limit 2 --json status -q '[.[].status] | all(",
+    "command": "until [ \"$(gh run list --limit 2 --json status -q '[.[].status] | all(. == \"comp",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx ask \" en son ne yaptık\"",
+    "command": "ctx ask \" en son ne yaptık\"",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/chrome-extension/ && ",
+    "command": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/chrome-extension/ && git log --",
+    "expect": "pass"
+  },
+  {
+    "label": "git branch --contains 62ccebf && echo \"---\" && git log --oneline --all",
+    "command": "git branch --contains 62ccebf && echo \"---\" && git log --oneline --all --graph -",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run list --limit 3 --json databaseId,displayTitle,status,conclusion",
+    "command": "gh run list --limit 3 --json databaseId,displayTitle,status,conclusion,updatedAt",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run view 24749935053 --json jobs -q '.jobs[] | {name: .name, status",
+    "command": "gh run view 24749935053 --json jobs -q '.jobs[] | {name: .name, status: .status,",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run view 24749983788 --json jobs -q '.jobs[] | {name: .name, status",
+    "command": "gh run view 24749983788 --json jobs -q '.jobs[] | {name: .name, status: .status,",
+    "expect": "pass"
+  },
+  {
+    "label": "cat /private/tmp/claude-501/-Users-tugayoktayokay-apps-Ik-Kolay/cd7e22",
+    "command": "cat /private/tmp/claude-501/-Users-tugayoktayokay-apps-Ik-Kolay/cd7e22b9-6a48-4e",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s https://remasterhr.com/api/healthz -w \"\n%{http_code}\n\" 2>&1 | ",
+    "command": "curl -s https://remasterhr.com/api/healthz -w \"\n%{http_code}\n\" 2>&1 | head -5 ",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s https://remasterhr.com/health -w \"\n%{http_code}\n\"",
+    "command": "curl -s https://remasterhr.com/health -w \"\n%{http_code}\n\"",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s -o /dev/null -w \"cv-builder-data (new endpoint): %{http_code}\n",
+    "command": "curl -s -o /dev/null -w \"cv-builder-data (new endpoint): %{http_code}\n\" https:/",
+    "expect": "pass"
+  },
+  {
+    "label": "dig +short remasterhr.com api.remasterhr.com && echo \"---\" && gh run v",
+    "command": "dig +short remasterhr.com api.remasterhr.com && echo \"---\" && gh run view 247499",
+    "expect": "pass"
+  },
+  {
+    "label": "gh run view 24749983788 --json conclusion,status && echo \"---\" && gh r",
+    "command": "gh run view 24749983788 --json conclusion,status && echo \"---\" && gh run view 24",
+    "expect": "pass"
+  },
+  {
+    "label": "curl -s -o /dev/null -w \"frontend: %{http_code}\n\" https://remasterhr.c",
+    "command": "curl -s -o /dev/null -w \"frontend: %{http_code}\n\" https://remasterhr.com && cur",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -nE \"^import|useState\" frontend/src/pages/Report.tsx | head -20",
+    "command": "grep -nE \"^import|useState\" frontend/src/pages/Report.tsx | head -20",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -nE \"cvStrengthenLabel|cvRebuildLabel|goToCvBuilder|cvPreparing|c",
+    "command": "grep -nE \"cvStrengthenLabel|cvRebuildLabel|goToCvBuilder|cvPreparing|cvAnalyzing",
+    "expect": "pass"
+  },
+  {
+    "label": "cd frontend && npx tsc --noEmit 2>&1 | head -30",
+    "command": "cd frontend && npx tsc --noEmit 2>&1 | head -30",
+    "expect": "pass"
+  },
+  {
+    "label": "git diff --stat",
+    "command": "git diff --stat",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -lt ~/.claude/projects/-Users-tugayoktayokay-tools-claude-code-ctx/",
+    "command": "ls -lt ~/.claude/projects/-Users-tugayoktayokay-tools-claude-code-ctx/*.jsonl 2>",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -c \"ctx_shell\\|ctx_read\\|ctx_grep\" /Users/tugayoktayokay/.claude/",
+    "command": "grep -c \"ctx_shell\\|ctx_read\\|ctx_grep\" /Users/tugayoktayokay/.claude/projects/-",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -o '\"name\":\"mcp__plugin_claude-code-ctx_ctx__ctx_[a-z_]*\"' /Users",
+    "command": "grep -o '\"name\":\"mcp__plugin_claude-code-ctx_ctx__ctx_[a-z_]*\"' /Users/tugayokta",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -oE 'ctx_[a-z_]+' /Users/tugayoktayokay/.claude/projects/-Users-t",
+    "command": "grep -oE 'ctx_[a-z_]+' /Users/tugayoktayokay/.claude/projects/-Users-tugayoktayo",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -oE '\"tool_use\"[^}]*\"name\":\"mcp__plugin_claude-code-ctx_ctx__[a-z",
+    "command": "grep -oE '\"tool_use\"[^}]*\"name\":\"mcp__plugin_claude-code-ctx_ctx__[a-z_]+\"' /Use",
+    "expect": "pass"
+  },
+  {
+    "label": "node -e ' const fs=require(\"fs\"); const lines=fs.readFileSync(\"/Users/",
+    "command": "node -e ' const fs=require(\"fs\"); const lines=fs.readFileSync(\"/Users/tugayoktay",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git add frontend/src/pages/",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git add frontend/src/pages/Report.tsx",
+    "expect": "pass"
+  },
+  {
+    "label": "node -e ' const fs=require(\"fs\"); const path=\"/Users/tugayoktayokay/.c",
+    "command": "node -e ' const fs=require(\"fs\"); const path=\"/Users/tugayoktayokay/.claude/proj",
+    "expect": "pass"
+  },
+  {
+    "label": "until [ \"$(gh run list --limit 1 --json status -q '.[0].status')\" = \"c",
+    "command": "until [ \"$(gh run list --limit 1 --json status -q '.[0].status')\" = \"completed\" ",
+    "expect": "pass"
+  },
+  {
+    "label": "node -e ' const fs=require(\"fs\"); const path=require(\"path\"); const ro",
+    "command": "node -e ' const fs=require(\"fs\"); const path=require(\"path\"); const root=\"/Users",
+    "expect": "pass"
+  },
+  {
+    "label": "ls ~/.claude/projects/ | grep -i customer",
+    "command": "ls ~/.claude/projects/ | grep -i customer",
+    "expect": "pass"
+  },
+  {
+    "label": "node -e ' const fs=require(\"fs\"); const path=require(\"path\"); const di",
+    "command": "node -e ' const fs=require(\"fs\"); const path=require(\"path\"); const dir=\"/Users/",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -lt ~/.claude/projects/-Users-tugayoktayokay-apps-CustomerFinder/*.",
+    "command": "ls -lt ~/.claude/projects/-Users-tugayoktayokay-apps-CustomerFinder/*.jsonl 2>/d",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -c 'ctx_shell\\|ctx_read\\|ctx_grep\\|ctx_cache_get' /Users/tugayokt",
+    "command": "grep -c 'ctx_shell\\|ctx_read\\|ctx_grep\\|ctx_cache_get' /Users/tugayoktayokay/.cl",
+    "expect": "pass"
+  },
+  {
+    "label": "grep -n 'ctx_shell\\|ctx_read\\|ctx_grep\\|ctx_cache_get' /Users/tugayokt",
+    "command": "grep -n 'ctx_shell\\|ctx_read\\|ctx_grep\\|ctx_cache_get' /Users/tugayoktayokay/.cl",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -lt ~/.config/ctx/mcp-cache/*.meta 2>/dev/null | head -15",
+    "command": "ls -lt ~/.config/ctx/mcp-cache/*.meta 2>/dev/null | head -15",
+    "expect": "pass"
+  },
+  {
+    "label": "for ref in 069f8a0027fb f63dc955c7ea 61b47646da31 895239237162 7d28822",
+    "command": "for ref in 069f8a0027fb f63dc955c7ea 61b47646da31 895239237162 7d28822792d5 cbf8",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -la ~/.config/ctx/mcp.log; wc -l ~/.config/ctx/mcp.log",
+    "command": "ls -la ~/.config/ctx/mcp.log; wc -l ~/.config/ctx/mcp.log",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/docs/ /Users/tugayokt",
+    "command": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/docs/ /Users/tugayoktayokay/app",
+    "expect": "pass"
+  },
+  {
+    "label": "tail -120 ~/.config/ctx/mcp.log",
+    "command": "tail -120 ~/.config/ctx/mcp.log",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/ | head -40",
+    "command": "ls -la /Users/tugayoktayokay/apps/CustomerFinder/ | head -40",
+    "expect": "pass"
+  },
+  {
+    "label": "ls /Users/tugayoktayokay/apps/CustomerFinder/docs/superpowers/specs/ 2",
+    "command": "ls /Users/tugayoktayokay/apps/CustomerFinder/docs/superpowers/specs/ 2>&1",
+    "expect": "pass"
+  },
+  {
+    "label": "git add docs/superpowers/specs/2026-04-22-deploy-ready-kit-measurement",
+    "command": "git add docs/superpowers/specs/2026-04-22-deploy-ready-kit-measurement-layer-des",
+    "expect": "pass"
+  },
+  {
+    "label": "git commit -m \"$(cat <<'EOF' docs(spec): deploy-ready kit + measuremen",
+    "command": "git commit -m \"$(cat <<'EOF' docs(spec): deploy-ready kit + measurement layer de",
+    "expect": "pass"
+  },
+  {
+    "label": "ls /Users/tugayoktayokay/apps/CustomerFinder/tests/ 2>&1 && echo \"---\"",
+    "command": "ls /Users/tugayoktayokay/apps/CustomerFinder/tests/ 2>&1 && echo \"---\" && ls /Us",
+    "expect": "pass"
+  },
+  {
+    "label": "ls frontend/src/components/ | head -30 && echo \"---\" && grep -rE \"bran",
+    "command": "ls frontend/src/components/ | head -30 && echo \"---\" && grep -rE \"brand-navy|bra",
+    "expect": "deny"
+  },
+  {
+    "label": "grep -rE \"brand-navy|brand-accent\" frontend/src/index.css 2>/dev/null ",
+    "command": "grep -rE \"brand-navy|brand-accent\" frontend/src/index.css 2>/dev/null | head -5;",
+    "expect": "deny"
+  },
+  {
+    "label": "mkdir -p /Users/tugayoktayokay/apps/CustomerFinder/docs/superpowers/pl",
+    "command": "mkdir -p /Users/tugayoktayokay/apps/CustomerFinder/docs/superpowers/plans",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay/frontend && npx tsc --noEmit 2",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay/frontend && npx tsc --noEmit 2>&1 | head",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && ls frontend/src/locales/",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && ls frontend/src/locales/",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git diff --stat",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git diff --stat",
+    "expect": "pass"
+  },
+  {
+    "label": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git status --porcelain",
+    "command": "cd /Users/tugayoktayokay/apps/Ik\\ Kolay && git status --porcelain",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx history 10",
+    "command": "ctx history 10",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx timeline 2>&1 | head -80",
+    "command": "ctx timeline 2>&1 | head -80",
+    "expect": "pass"
+  },
+  {
+    "label": "ls -la /Users/tugayoktayokay/.claude/projects/-Users-tugayoktayokay-ap",
+    "command": "ls -la /Users/tugayoktayokay/.claude/projects/-Users-tugayoktayokay-apps-hakliyi",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx stats 2>&1 | head -50",
+    "command": "ctx stats 2>&1 | head -50",
+    "expect": "pass"
+  },
+  {
+    "label": "ctx file /Users/tugayoktayokay/.claude/projects/-Users-tugayoktayokay-",
+    "command": "ctx file /Users/tugayoktayokay/.claude/projects/-Users-tugayoktayokay-apps-hakli",
+    "expect": "pass"
+  }
+]

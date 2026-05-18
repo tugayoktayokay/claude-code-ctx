@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.7.x (pre_tool_use rules; ctx_grep / ctx_shell redirects)
+
 **Goal:** Expand and sharpen `pre_tool_use` rules so Claude gets redirected to `ctx_shell` / `ctx_read` / `ctx_grep` for heavy Bash commands, and log each deny/ask decision in a structured format that phase 2 can mine.
 
 **Architecture:** No new code paths. The per-rule `mode` override is already honored by `src/hooks.js::handlePreToolUse` (see existing test `pre-tool-use ask mode vs deny mode per rule` at `src/test/hooks.test.js:288`). This plan adds `mode: "deny"` to 4 rules, adds 6 new rules, rewrites MCP tool descriptions, and changes one log line format.

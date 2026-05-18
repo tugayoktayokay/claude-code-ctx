@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.7.7 (Edit-pressure-aware proactive /compact)
+
 **Goal:** Add an edit-pressure signal that fires existing `compact`-level behavior earlier when recent Edit post_tool events signal imminent context pressure, cutting the observed 80% critical-level Stop rate toward ~40-60%.
 
 **Architecture:** `analyzer.js` sums Edit tool_result sizes across the last `window_turns` assistant messages and exposes `editPressureKB`. `decision.js` applies a virtual pct bump to the level cutoff comparison when pressure exceeds threshold — `contextPct` stays truthful in output, only level selection sees the bump. `strategy.js` appends `recent Edit diffs` to the drop list and `ctx statusline` prepends a `⚡` marker when the flag is set. Pressure-off path is byte-identical to pre-0.7.7.

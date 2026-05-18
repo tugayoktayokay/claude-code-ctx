@@ -47,6 +47,7 @@ function withDoctorFixture(matchers, fn, opts = {}) {
       enabled: true,
       bash_dedup: { enabled: true },
     },
+    ...(opts.configOverlay || {}),
   }, null, 2));
   if (opts.hooksLog) {
     const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
@@ -101,4 +102,19 @@ test('doctor accepts plugin manifest that reaches working_memory tool hooks', ()
     assert.equal(rows.length, 1);
     assert.equal(rows[0].level, 'ok');
   });
+});
+
+test('doctor drift thresholds honor config.doctor.drift overrides', () => {
+  // 4 cache writes — below default min (10), would be silent. Lower threshold to 3 → warn fires.
+  const hooksLog = [
+    '2026-05-18T10:00:00.000Z cache-write ref=a bytes=5000',
+    '2026-05-18T10:01:00.000Z cache-write ref=b bytes=5000',
+    '2026-05-18T10:02:00.000Z cache-write ref=c bytes=5000',
+    '2026-05-18T10:03:00.000Z cache-write ref=d bytes=5000',
+  ].join('\n');
+  withDoctorFixture(['Bash', 'Read'], (doctor) => {
+    const rows = doctor.checkRuntimeDrift();
+    assert.ok(rows.some(r => r.label === 'Cache reuse' && r.level === 'warn'),
+      `expected Cache reuse warn at lowered threshold; got: ${rows.map(r=>r.label).join(',')}`);
+  }, { hooksLog, configOverlay: { doctor: { drift: { cache_min_writes: 3 } } } });
 });

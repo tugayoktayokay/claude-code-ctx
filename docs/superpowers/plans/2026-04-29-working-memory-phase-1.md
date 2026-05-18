@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ shipped in v0.8.0-rc.1 + v0.8.3 (Read dedup; manifest wired in v0.8.3)
+
 **Goal:** Add session-scoped working memory that detects duplicate `Read` calls within a session and replaces the 2nd+ read with a short reference, cutting token waste from re-read `.md` files and delaying mid-session compaction.
 
 **Architecture:** Pure-Node module `src/working_memory.js` maintains per-session state at `~/.config/ctx/working_memory/<sid>.json` (path→hash map) and `blobs/<sid>/<hash>.txt` (content). Hooks intercept Read in `src/hooks.js`: PreToolUse denies-with-redirect on hash match; PostToolUse records hash + content blob. New MCP tool `ctx_recall_read` lets Claude fetch cached content. Feature ships behind a config flag (`enabled: false` by default).

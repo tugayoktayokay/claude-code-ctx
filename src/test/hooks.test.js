@@ -1143,3 +1143,24 @@ test('PreToolUse Bash: window expired → pass through', () => {
     delete process.env.CTX_WORKING_MEMORY_DIR;
   }
 });
+
+test('splitShellArgs keeps $(...) and backticks as opaque single tokens', () => {
+  const { splitShellArgs } = require('../hooks.js');
+  assert.deepEqual(
+    splitShellArgs('-r "$(cat patterns.txt)" .'),
+    ['-r', '$(cat patterns.txt)', '.'],
+    'subshell stays intact'
+  );
+  assert.deepEqual(
+    splitShellArgs('-rn `date +%Y` /tmp'),
+    ['-rn', '`date +%Y`', '/tmp'],
+    'backtick stays intact'
+  );
+});
+
+test('recursiveGrepExample dynamically constructs ctx_grep call from real command', () => {
+  const { recursiveGrepExample } = require('../hooks.js');
+  const out = recursiveGrepExample('grep -rn "AsyncStorage" apps/mobile/store/');
+  assert.match(out, /ctx_grep\(\{pattern: "AsyncStorage", path: "apps\/mobile\/store\/"/);
+});
+
