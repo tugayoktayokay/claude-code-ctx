@@ -23,6 +23,7 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
   results.push(checkWorkingMemory());
   results.push(...checkConfig());
   results.push(...checkHooksInstalled(cwdBinary));
+  results.push(...checkFeatureWiring());
   results.push(...checkDaemon());
   results.push(...checkBinaryPath(cwdBinary));
   results.push(checkLogRotation());
@@ -110,6 +111,66 @@ function checkPluginRegistration() {
   } catch {
     return null;
   }
+}
+
+function findCtxPluginInstall() {
+  const installedPath = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+  if (!fs.existsSync(installedPath)) return null;
+  try {
+    const reg = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
+    const plugins = reg?.plugins || {};
+    for (const key of Object.keys(plugins)) {
+      if (key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx' || key.startsWith('ctx@') || key === 'ctx') {
+        const entries = plugins[key];
+        const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
+        return { key, ...latest };
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function pluginPreToolMatchers(installPath) {
+  if (!installPath) return null;
+  const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    const plugin = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const groups = plugin?.hooks?.PreToolUse || [];
+    return new Set(groups.map(g => g.matcher || '*'));
+  } catch {
+    return null;
+  }
+}
+
+function checkFeatureWiring() {
+  const out = [];
+  let config;
+  try { config = loadConfig(); } catch { return out; }
+
+  const plugin = findCtxPluginInstall();
+  const matchers = pluginPreToolMatchers(plugin?.installPath);
+  if (!matchers) return out;
+  if (matchers.has('*')) return out;
+
+  const missing = [];
+  if (config?.working_memory?.enabled && !matchers.has('Read')) {
+    missing.push('Read');
+  }
+  if (config?.working_memory?.enabled && config?.working_memory?.bash_dedup?.enabled && !matchers.has('Bash')) {
+    missing.push('Bash');
+  }
+
+  if (missing.length) {
+    out.push({
+      ...CHECKS.warn,
+      label: 'Feature wiring',
+      detail: `working_memory enabled but plugin PreToolUse does not reach: ${missing.join(', ')} — run /plugin update claude-code-ctx@claude-code-ctx`,
+    });
+  } else {
+    out.push({ ...CHECKS.ok, label: 'Feature wiring', detail: 'enabled features are reachable from plugin manifest' });
+  }
+  return out;
 }
 
 function checkHooksInstalled(cwdBinary) {
@@ -212,4 +273,4 @@ function checkLogRotation() {
   }
 }
 
-module.exports = { runChecks, CHECKS };
+module.exports = { runChecks, CHECKS, checkFeatureWiring };
