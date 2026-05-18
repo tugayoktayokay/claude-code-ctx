@@ -1,0 +1,62 @@
+[
+  {
+    "label": "FitCrate grep combined flags piped through head",
+    "command": "grep -rn \"FlatList\\|\\.map(\" screens components --include=\"*.tsx\" | grep -v node_modules | head -60",
+    "expect": "deny"
+  },
+  {
+    "label": "FitCrate cd-prefixed recursive grep",
+    "command": "cd /Users/tugayoktayokay/apps/FitCrate && grep -rn \"AsyncStorage\\|persist\\|createJSONStorage\" apps/mobile/store/ 2>&1 | head -20",
+    "expect": "deny"
+  },
+  {
+    "label": "FitCrate bounded grep over single file",
+    "command": "grep -n \"AppHeader\\|SegmentButton active={tab\" /Users/tugayoktayokay/apps/FitCrate/apps/mobile/screens/PantryScreen.tsx | head",
+    "expect": "pass"
+  },
+  {
+    "label": "FitCrate package.json grep after cat",
+    "command": "cat /Users/tugayoktayokay/apps/FitCrate/apps/mobile/package.json | grep -E \"expo-notifications|firebase/messaging|expo-device\"",
+    "expect": "pass"
+  },
+  {
+    "label": "FitCrate typecheck tail bounded",
+    "command": "cd /Users/tugayoktayokay/apps/FitCrate/apps/mobile && pnpm typecheck 2>&1 | tail -20",
+    "expect": "pass"
+  },
+  {
+    "label": "recursive ls root",
+    "command": "ls -R /Users/tugayoktayokay/apps/FitCrate | head -50",
+    "expect": "ask"
+  },
+  {
+    "label": "scoped find source files",
+    "command": "find /Users/tugayoktayokay/apps/FitCrate -type f -name \"*.tsx\" | head -40",
+    "expect": "pass"
+  },
+  {
+    "label": "unbounded home find",
+    "command": "find ~/ -print",
+    "expect": "deny"
+  },
+  {
+    "label": "docker logs without tail",
+    "command": "docker logs fitcrate-api",
+    "expect": "ask"
+  },
+  {
+    "label": "docker logs with tail",
+    "command": "docker logs --tail 200 fitcrate-api",
+    "expect": "pass"
+  },
+  {
+    "label": "git log unbounded",
+    "command": "git log",
+    "expect": "ask"
+  },
+  {
+    "label": "git log bounded oneline",
+    "command": "git log --oneline -n 20",
+    "expect": "pass"
+  }
+]
