@@ -25,6 +25,7 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
   results.push(checkWorkingMemory());
   results.push(...checkConfig());
   results.push(...checkHooksInstalled(cwdBinary));
+  results.push(...checkPluginVersionDrift());
   results.push(...checkFeatureWiring());
   results.push(...checkRuntimeDrift());
   results.push(...checkDaemon());
@@ -32,6 +33,15 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
   results.push(checkLogRotation());
 
   return results;
+}
+
+function localPackageVersion() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    return pkg.version || null;
+  } catch {
+    return null;
+  }
 }
 
 function checkNodeVersion() {
@@ -178,6 +188,21 @@ function checkFeatureWiring() {
     out.push({ ...CHECKS.ok, label: 'Feature wiring', detail: 'enabled features are reachable from plugin manifest' });
   }
   return out;
+}
+
+function checkPluginVersionDrift() {
+  const plugin = findCtxPluginInstall();
+  if (!plugin) return [];
+  const localVersion = localPackageVersion();
+  const installedVersion = plugin.version || null;
+  if (!localVersion || !installedVersion || installedVersion === localVersion) {
+    return [{ ...CHECKS.ok, label: 'Plugin version', detail: installedVersion ? `installed v${installedVersion}` : 'installed version unknown' }];
+  }
+  return [{
+    ...CHECKS.warn,
+    label: 'Plugin version',
+    detail: `installed v${installedVersion}, source v${localVersion} — run /plugin marketplace update claude-code-ctx && /plugin update claude-code-ctx@claude-code-ctx`,
+  }];
 }
 
 const DRIFT_DEFAULTS = {
@@ -345,4 +370,4 @@ function checkLogRotation() {
   }
 }
 
-module.exports = { runChecks, CHECKS, checkFeatureWiring, checkRuntimeDrift };
+module.exports = { runChecks, CHECKS, checkFeatureWiring, checkRuntimeDrift, checkPluginVersionDrift, localPackageVersion };

@@ -158,6 +158,9 @@ ctx timeline                 # threaded history
 ctx diff <a> <b>             # snapshot delta
 ctx stats [--week|--month]   # aggregation
 ctx heavy                    # largest outputs in current session
+ctx working-set              # active files, recent commands, last test/error
+ctx repomap [--limit N]      # compact repository file/symbol map
+ctx savings [--days N]       # estimated token savings from cache + dedup
 ctx bloat                    # system-prompt footprint audit
 ctx usage --tools --days 30  # tool usage across sessions
 ctx report --out file.html   # self-contained HTML report

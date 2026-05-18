@@ -64,6 +64,9 @@ Analysis + memory:
   ctx usage [--tools|--skills] [--days 30]
                                      Aggregate tool/skill usage across sessions
   ctx heavy [jsonl-path]             Largest tool outputs in current session
+  ctx working-set                    Active files, recent commands, last test/error
+  ctx repomap [--limit N]            Compact repository file/symbol map
+  ctx savings [--days N]             Estimated tokens saved by cache + dedup
   ctx metrics                        Last 7d obey rate, bypass offenders, cache hit rate
   ctx statusline                     One-line status for Claude Code statusline hook
   ctx report [--out PATH] [--days N] Generate self-contained HTML report
@@ -721,6 +724,35 @@ function runMetrics(_args, _config) {
   }
 }
 
+function runWorkingSet(_args, config) {
+  stripColor();
+  const { buildWorkingSet, formatWorkingSet } = require('./working_set.js');
+  process.stdout.write(formatWorkingSet(buildWorkingSet({ cwd: process.cwd(), config })));
+  return 0;
+}
+
+function runRepoMap(args, _config) {
+  stripColor();
+  const { buildRepoMap, formatRepoMap } = require('./repomap.js');
+  let limit = 120;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--limit' && args[i + 1]) { limit = Number(args[i + 1]) || limit; i++; }
+  }
+  process.stdout.write(formatRepoMap(buildRepoMap({ cwd: process.cwd(), limit })));
+  return 0;
+}
+
+function runSavings(args, _config) {
+  stripColor();
+  const { estimateSavings, formatSavings } = require('./savings.js');
+  let rangeDays = 7;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--days' && args[i + 1]) { rangeDays = Number(args[i + 1]) || rangeDays; i++; }
+  }
+  process.stdout.write(formatSavings(estimateSavings(undefined, { rangeDays })));
+  return 0;
+}
+
 function runPluginFix(_args, _config) {
   // Workaround for a Claude Code plugin-manager bug where `/plugin update` or
   // `autoUpdate` removes the cache directory but doesn't regenerate it, leaving
@@ -1007,6 +1039,12 @@ function main(argv) {
       return runUsage(rest, config);
     case 'heavy':
       return runHeavy(rest, config);
+    case 'working-set':
+      return runWorkingSet(rest, config);
+    case 'repomap':
+      return runRepoMap(rest, config);
+    case 'savings':
+      return runSavings(rest, config);
     case 'statusline':
       return runStatusline(rest, config);
     case 'serve':

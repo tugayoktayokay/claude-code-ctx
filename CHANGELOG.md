@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.8] — 2026-05-18
+
+### Added
+- `ctx working-set` — active git changes, files, recent commands, last test/error, and largest current-session outputs.
+- `ctx repomap` — compact repository file/symbol map inspired by Codex Ctx.
+- `ctx savings` — rough token savings estimate from cache hits plus working-memory dedup hits.
+- `ctx doctor` now warns when the installed Claude Code plugin version differs from the source checkout version.
+
 ## [v0.8.7] — 2026-05-18
 
 ### Added

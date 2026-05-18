@@ -104,6 +104,15 @@ test('doctor accepts plugin manifest that reaches working_memory tool hooks', ()
   });
 });
 
+test('doctor warns when installed plugin version differs from source version', () => {
+  withDoctorFixture(['Bash', 'Read'], (doctor) => {
+    const rows = doctor.checkPluginVersionDrift();
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].level, 'warn');
+    assert.match(rows[0].detail, /installed vtest, source v/);
+  });
+});
+
 test('doctor drift thresholds honor config.doctor.drift overrides', () => {
   // 4 cache writes — below default min (10), would be silent. Lower threshold to 3 → warn fires.
   const hooksLog = [
