@@ -5,6 +5,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.10] — 2026-05-18
+
+### Fixed
+- **Cache-write hints were not callable MCP syntax.** `ctx_shell` / `ctx_read` / `ctx_grep` previously emitted `ref: abc123  (ctx_cache_get ref="abc123" offset=0 to read chunks)` — which Claude would have to translate into a JSON tool call by hand. With 338+ cache writes and only 3 read hits (last 7d), the hint was the bottleneck. Now emits a directly callable line: `Recall full content: ctx_cache_get({ref: "abc123", offset: 0, limit: 4000})`.
+- `ctx_cache_get` description rewritten to be unambiguous about when and how to call it (includes an inline example).
+
 ## [v0.8.9] — 2026-05-18
 
 ### Fixed
@@ -86,7 +92,8 @@ Highlights across the 0.7 line:
 
 Earlier releases are documented in commit history.
 
-[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.9...HEAD
+[Unreleased]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.10...HEAD
+[v0.8.10]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.9...v0.8.10
 [v0.8.9]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.8...v0.8.9
 [v0.8.7]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.6...v0.8.7
 [v0.8.6]: https://github.com/tugayoktayokay/claude-code-ctx/compare/v0.8.5...v0.8.6

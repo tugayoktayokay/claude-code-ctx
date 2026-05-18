@@ -187,7 +187,8 @@ const memoryTools = [
       const cached = cache.writeCache(blob, { gc: (config && config.cache && config.cache.gc) || {} });
       return okText([
         `${header} → summarized`,
-        `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 to read chunks)`,
+        `ref: ${cached.ref}`,
+        `Recall full content: ctx_cache_get({ref: ${JSON.stringify(cached.ref)}, offset: 0, limit: 4000})`,
         '',
         cache.summarizeLines(blob, summaryOpts(config)),
       ].join('\n'));
@@ -305,7 +306,8 @@ const wrapperTools = [
           const summary = cache.summarizeLines(combined, summaryOpts(config));
           resolve(okText([
             `[ctx_shell ${status}, ${combined.length}B → summarized]`,
-            `ref: ${cached.ref}  (ctx_cache_get ref="${cached.ref}" offset=0 to read chunks)`,
+            `ref: ${cached.ref}`,
+            `Recall full content: ctx_cache_get({ref: ${JSON.stringify(cached.ref)}, offset: 0, limit: 4000})`,
             '',
             summary,
           ].join('\n')));
@@ -351,7 +353,8 @@ const wrapperTools = [
       const summary = cache.summarizeLines(slice, summaryOpts(config));
       return okText([
         `[ctx_read ${filePath}, ${content.length}B → summarized]`,
-        `ref: ${cached.ref}  (ctx_cache_get to read chunks)`,
+        `ref: ${cached.ref}`,
+        `Recall full content: ctx_cache_get({ref: ${JSON.stringify(cached.ref)}, offset: 0, limit: 4000})`,
         '',
         summary,
       ].join('\n'));
@@ -408,6 +411,7 @@ const wrapperTools = [
       return okText([
         `[ctx_grep ${stdout.length}B of matches → summarized]`,
         `ref: ${cached.ref}`,
+        `Recall full matches: ctx_cache_get({ref: ${JSON.stringify(cached.ref)}, offset: 0, limit: 4000})`,
         '',
         summary,
       ].join('\n'));
@@ -415,7 +419,7 @@ const wrapperTools = [
   },
   {
     name: 'ctx_cache_get',
-    description: 'Retrieve a chunk of cached output from a prior ctx_shell/ctx_read/ctx_grep call by its ref. Use offset/limit to page through.',
+    description: '**Call this whenever you see "ref: <hash>" in a ctx_shell/ctx_read/ctx_grep result and need the full content.** Returns a paged chunk of the cached output. Example: ctx_cache_get({ref: "abc123def456", offset: 0, limit: 4000}). Use larger offsets to page through. Refs expire after the cache TTL — fetch them while they are fresh.',
     inputSchema: {
       type: 'object',
       properties: {

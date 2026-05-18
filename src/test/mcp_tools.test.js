@@ -41,6 +41,36 @@ test('ctx_shell summarizes + caches when output large', async () => {
   assert.match(r, /more lines omitted/);
 });
 
+test('cache-write hints render as real MCP tool-call syntax (regression: shell-form was uncallable)', async () => {
+  // Old hint `(ctx_cache_get ref="X" offset=0 to read chunks)` looked like a
+  // shell command. Claude cannot execute MCP tools that way — must be JSON
+  // args. Cache hit rate stayed ~1% until we switched to call-syntax hints.
+  const callRe = /ctx_cache_get\(\{ref:\s*"[a-f0-9]{12}",\s*offset:\s*0,\s*limit:\s*\d+\}\)/;
+  const cfg = loadDefaults();
+
+  const shellRes = await getTool('ctx_shell').handler({
+    command: `node -e "for(let i=0;i<500;i++){console.log('x '+i)}"`,
+    limit_bytes: 200,
+  }, { config: cfg });
+  assert.match(shellRes, callRe, 'ctx_shell hint missing JSON call syntax');
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hint-read-'));
+  const p = path.join(tmp, 'big.txt');
+  fs.writeFileSync(p, Array.from({ length: 500 }, (_, i) => `row ${i}`).join('\n'));
+  try {
+    const readRes = await getTool('ctx_read').handler({ path: p, limit_bytes: 200 }, { config: cfg });
+    assert.match(readRes, callRe, 'ctx_read hint missing JSON call syntax');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+
+  const tmpG = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-hint-grep-'));
+  fs.writeFileSync(path.join(tmpG, 'a.txt'),
+    Array.from({ length: 500 }, (_, i) => `needle ${i}`).join('\n'));
+  try {
+    const grepRes = await getTool('ctx_grep').handler({ pattern: 'needle', path: tmpG, limit_bytes: 200 }, { config: cfg });
+    assert.match(grepRes, callRe, 'ctx_grep hint missing JSON call syntax');
+  } finally { fs.rmSync(tmpG, { recursive: true, force: true }); }
+});
+
 test('ctx_read small file returns inline', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-read-'));
   const p = path.join(tmp, 'a.txt');
