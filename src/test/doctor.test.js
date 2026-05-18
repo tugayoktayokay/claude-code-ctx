@@ -6,7 +6,7 @@ const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
 
-function withDoctorFixture(matchers, fn) {
+function withDoctorFixture(matchers, fn, opts = {}) {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-doctor-'));
   const prevHome = process.env.HOME;
   process.env.HOME = tmpHome;
@@ -48,6 +48,11 @@ function withDoctorFixture(matchers, fn) {
       bash_dedup: { enabled: true },
     },
   }, null, 2));
+  if (opts.hooksLog) {
+    const logPath = path.join(tmpHome, '.config', 'ctx', 'hooks.log');
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.writeFileSync(logPath, opts.hooksLog);
+  }
 
   try {
     const doctor = require('../doctor.js');
@@ -67,6 +72,27 @@ test('doctor warns when enabled working_memory is not reachable from plugin mani
     assert.equal(rows[0].level, 'warn');
     assert.match(rows[0].detail, /Read/);
   });
+});
+
+test('doctor warns when runtime metrics show enabled features are unused', () => {
+  const hooksLog = [
+    '2026-05-18T10:00:00.000Z pre_tool session=S action=deny tool=Bash pattern="^grep" cmd_head="grep -r foo ." reason="recursive"',
+    '2026-05-18T10:01:00.000Z cache-write ref=aaa bytes=5000',
+    '2026-05-18T10:02:00.000Z cache-write ref=bbb bytes=6000',
+    '2026-05-18T10:03:00.000Z cache-write ref=ccc bytes=7000',
+    '2026-05-18T10:04:00.000Z cache-write ref=ddd bytes=8000',
+    '2026-05-18T10:05:00.000Z cache-write ref=eee bytes=9000',
+    '2026-05-18T10:06:00.000Z cache-write ref=fff bytes=10000',
+    '2026-05-18T10:07:00.000Z cache-write ref=ggg bytes=11000',
+    '2026-05-18T10:08:00.000Z cache-write ref=hhh bytes=12000',
+    '2026-05-18T10:09:00.000Z cache-write ref=iii bytes=13000',
+    '2026-05-18T10:10:00.000Z cache-write ref=jjj bytes=14000',
+  ].join('\n');
+  withDoctorFixture(['Bash', 'Read'], (doctor) => {
+    const rows = doctor.checkRuntimeDrift();
+    assert.ok(rows.some(r => r.label === 'Runtime drift' && r.level === 'warn'));
+    assert.ok(rows.some(r => r.label === 'Cache reuse' && r.level === 'warn'));
+  }, { hooksLog });
 });
 
 test('doctor accepts plugin manifest that reaches working_memory tool hooks', () => {

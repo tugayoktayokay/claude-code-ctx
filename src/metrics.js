@@ -140,7 +140,17 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
       const bucket = pre.action === 'deny' ? result.deny : result.ask;
       bucket.total++;
       const patt = pre.pattern || '';
-      if (!result.per_rule.has(patt)) result.per_rule.set(patt, { triggers: 0, bypasses: 0 });
+      if (!result.per_rule.has(patt)) {
+        result.per_rule.set(patt, {
+          triggers: 0,
+          obeyed: 0,
+          bypasses: 0,
+          abandoned: 0,
+          redirected: 0,
+          user_approved: 0,
+          canceled: 0,
+        });
+      }
       result.per_rule.get(patt).triggers++;
 
       const preMs = toMs(pre.ts);
@@ -168,7 +178,6 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         const exitKnown = Number.isFinite(exitNum);
         if (isBashPost && exitKnown && exitNum === 0) {
           classification = pre.action === 'deny' ? 'bypassed' : 'user_approved';
-          if (pre.action === 'deny') result.per_rule.get(patt).bypasses++;
         } else if (isBashPost && exitKnown && exitNum !== 0) {
           classification = pre.action === 'deny' ? 'bypass_failed' : 'approved_failed';
         } else if (isBashPost && !exitKnown) {
@@ -182,6 +191,13 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
         classification = pre.action === 'deny' ? 'abandoned' : 'canceled';
       }
       bucket[classification]++;
+      const ruleStats = result.per_rule.get(patt);
+      if (classification === 'obeyed') ruleStats.obeyed++;
+      else if (classification === 'bypassed') ruleStats.bypasses++;
+      else if (classification === 'abandoned') ruleStats.abandoned++;
+      else if (classification === 'redirected') ruleStats.redirected++;
+      else if (classification === 'user_approved') ruleStats.user_approved++;
+      else if (classification === 'canceled') ruleStats.canceled++;
     }
   }
 
@@ -189,11 +205,23 @@ function correlate(records, { windowSeconds = WINDOW_SECONDS_DEFAULT } = {}) {
     .map(([pattern, v]) => ({
       pattern,
       triggers: v.triggers,
+      obeyed: v.obeyed,
       bypasses: v.bypasses,
+      abandoned: v.abandoned,
+      redirected: v.redirected,
+      user_approved: v.user_approved,
+      canceled: v.canceled,
       bypass_rate: v.triggers ? v.bypasses / v.triggers : 0,
+      canceled_rate: v.triggers ? v.canceled / v.triggers : 0,
+      abandoned_rate: v.triggers ? v.abandoned / v.triggers : 0,
     }))
-    .sort((a, b) => b.bypass_rate - a.bypass_rate || b.bypasses - a.bypasses)
-    .slice(0, 10);
+    .sort((a, b) => {
+      const aRate = Math.max(a.bypass_rate, a.canceled_rate, a.abandoned_rate);
+      const bRate = Math.max(b.bypass_rate, b.canceled_rate, b.abandoned_rate);
+      return bRate - aRate
+        || (b.bypasses + b.canceled + b.abandoned) - (a.bypasses + a.canceled + a.abandoned);
+    })
+    .slice(0, 20);
 
   return {
     pre_tool: {
@@ -229,31 +257,16 @@ function aggregateCache(records) {
     }
   }
   const hit_rate = reads ? read_hits / reads : 0;
-  return { writes, reads, read_hits, read_misses, hit_rate, gc_sweeps, gc_evicted, gc_bytes_freed };
+  const utilization_rate = writes ? read_hits / writes : 0;
+  return { writes, reads, read_hits, read_misses, hit_rate, utilization_rate, gc_sweeps, gc_evicted, gc_bytes_freed };
 }
 
-function aggregate(logPath, { now = Date.now(), rangeDays = 7, windowSeconds = 60 } = {}) {
-  const { records, parseErrors } = parseLog(logPath);
-  const inRange = records.filter(r => withinRange(r.ts, now, rangeDays));
-  const corr = correlate(inRange, { windowSeconds });
-  const cache = aggregateCache(inRange);
-  return {
-    range_days: rangeDays,
-    window_seconds: windowSeconds,
-    pre_tool: corr.pre_tool,
-    per_rule: corr.per_rule,
-    cache,
-    unscoped: corr.unscoped,
-    parse_errors: parseErrors,
-  };
-}
-
-function aggregateMetrics(records) {
-  const corr = correlate(records);
+function aggregateWorkingMemory(records) {
   const wm = {
     dedup_hits: 0,
     bytes_saved: 0,
     recall_calls: 0,
+    recall_hits: 0,
     recall_rate: 0,
     bash_dedup_hits: 0,
     bash_bytes_saved: 0,
@@ -266,6 +279,7 @@ function aggregateMetrics(records) {
       if (Number.isFinite(n)) wm.bytes_saved += n;
     } else if (r.action === 'recall_call') {
       wm.recall_calls++;
+      if (r.hit === 'true') wm.recall_hits++;
     } else if (r.action === 'bash_dedup_hit') {
       wm.bash_dedup_hits++;
       const n = Number(r.bytes_saved);
@@ -273,7 +287,31 @@ function aggregateMetrics(records) {
     }
   }
   wm.recall_rate = wm.dedup_hits ? wm.recall_calls / wm.dedup_hits : 0;
+  return wm;
+}
+
+function aggregate(logPath, { now = Date.now(), rangeDays = 7, windowSeconds = 60 } = {}) {
+  const { records, parseErrors } = parseLog(logPath);
+  const inRange = records.filter(r => withinRange(r.ts, now, rangeDays));
+  const corr = correlate(inRange, { windowSeconds });
+  const cache = aggregateCache(inRange);
+  const working_memory = aggregateWorkingMemory(inRange);
+  return {
+    range_days: rangeDays,
+    window_seconds: windowSeconds,
+    pre_tool: corr.pre_tool,
+    per_rule: corr.per_rule,
+    cache,
+    working_memory,
+    unscoped: corr.unscoped,
+    parse_errors: parseErrors,
+  };
+}
+
+function aggregateMetrics(records) {
+  const corr = correlate(records);
+  const wm = aggregateWorkingMemory(records);
   return { ...(corr || {}), working_memory: wm };
 }
 
-module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, IGNORED_EVENT_TYPES, correlate, CTX_MCP_TOOL_RE, aggregate, aggregateCache, aggregateMetrics };
+module.exports = { parseLine, parseKeyValues, parseLog, parseLogPath, parseLogString, EVENT_TYPES, IGNORED_EVENT_TYPES, correlate, CTX_MCP_TOOL_RE, aggregate, aggregateCache, aggregateWorkingMemory, aggregateMetrics };

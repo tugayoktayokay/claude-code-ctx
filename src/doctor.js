@@ -8,6 +8,8 @@ const { PID_FILE, LOG_FILE } = require('./daemon.js');
 const { loadConfig, USER_PATH, DEFAULT_PATH } = require('./config.js');
 const { CTX_HOOK_EVENTS } = hooksInstall;
 
+const HOOKS_LOG_FILE = path.join(os.homedir(), '.config', 'ctx', 'hooks.log');
+
 const CHECKS = {
   ok:   { icon: '✓', level: 'ok' },
   warn: { icon: '⚠', level: 'warn' },
@@ -24,6 +26,7 @@ function runChecks({ cwdBinary = process.argv[1] } = {}) {
   results.push(...checkConfig());
   results.push(...checkHooksInstalled(cwdBinary));
   results.push(...checkFeatureWiring());
+  results.push(...checkRuntimeDrift());
   results.push(...checkDaemon());
   results.push(...checkBinaryPath(cwdBinary));
   results.push(checkLogRotation());
@@ -130,17 +133,21 @@ function findCtxPluginInstall() {
   return null;
 }
 
-function pluginPreToolMatchers(installPath) {
+function hookMatchers(installPath, eventName) {
   if (!installPath) return null;
   const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
   if (!fs.existsSync(manifestPath)) return null;
   try {
     const plugin = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    const groups = plugin?.hooks?.PreToolUse || [];
+    const groups = plugin?.hooks?.[eventName] || [];
     return new Set(groups.map(g => g.matcher || '*'));
   } catch {
     return null;
   }
+}
+
+function pluginPreToolMatchers(installPath) {
+  return hookMatchers(installPath, 'PreToolUse');
 }
 
 function checkFeatureWiring() {
@@ -169,6 +176,52 @@ function checkFeatureWiring() {
     });
   } else {
     out.push({ ...CHECKS.ok, label: 'Feature wiring', detail: 'enabled features are reachable from plugin manifest' });
+  }
+  return out;
+}
+
+function checkRuntimeDrift() {
+  const out = [];
+  let config;
+  try { config = loadConfig(); } catch { return out; }
+
+  if (!fs.existsSync(HOOKS_LOG_FILE)) {
+    out.push({ ...CHECKS.info, label: 'Runtime drift', detail: 'hooks.log not created yet' });
+    return out;
+  }
+
+  let record;
+  try {
+    const metrics = require('./metrics.js');
+    record = metrics.aggregate(HOOKS_LOG_FILE, { now: Date.now(), rangeDays: 7 });
+  } catch (err) {
+    out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: `metrics unavailable: ${err.message}` });
+    return out;
+  }
+
+  const wm = record.working_memory || {};
+  const wmEvents = (wm.dedup_hits || 0) + (wm.recall_calls || 0) + (wm.bash_dedup_hits || 0);
+  if (config?.working_memory?.enabled && record.pre_tool?.total > 0 && wmEvents === 0) {
+    out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: 'working_memory enabled but no working_memory events in last 7d' });
+  }
+
+  const deny = record.pre_tool?.deny || {};
+  if ((deny.total || 0) >= 5 && (deny.obeyed || 0) / deny.total < 0.5) {
+    out.push({ ...CHECKS.warn, label: 'Deny obey rate', detail: `${deny.obeyed}/${deny.total} obeyed in last 7d — deny guidance may be too vague` });
+  }
+
+  const ask = record.pre_tool?.ask || {};
+  if ((ask.total || 0) >= 5 && (ask.canceled || 0) / ask.total > 0.5) {
+    out.push({ ...CHECKS.warn, label: 'Ask cancel rate', detail: `${ask.canceled}/${ask.total} canceled in last 7d — inspect top canceled rules` });
+  }
+
+  const cache = record.cache || {};
+  if ((cache.writes || 0) >= 10 && (cache.read_hits || 0) === 0) {
+    out.push({ ...CHECKS.warn, label: 'Cache reuse', detail: `${cache.writes} writes but 0 hit reads in last 7d — ctx_cache_get guidance is not being followed` });
+  }
+
+  if (!out.length) {
+    out.push({ ...CHECKS.ok, label: 'Runtime drift', detail: 'recent hook metrics look consistent' });
   }
   return out;
 }
@@ -273,4 +326,4 @@ function checkLogRotation() {
   }
 }
 
-module.exports = { runChecks, CHECKS, checkFeatureWiring };
+module.exports = { runChecks, CHECKS, checkFeatureWiring, checkRuntimeDrift };

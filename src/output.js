@@ -295,10 +295,28 @@ function printMetrics(r) {
   console.log('');
   if (r.per_rule && r.per_rule.length) {
     console.log(C.dim + '  top bypassed rules (needs attention):' + C.reset);
+    let printed = false;
     for (const rule of r.per_rule.slice(0, 5)) {
       if (!rule.bypasses) continue;
+      printed = true;
       const pctStr = Math.round(100 * rule.bypass_rate).toString().padStart(3) + '%';
       console.log(`    ${rule.pattern.padEnd(32)} ${rule.bypasses} bypasses / ${rule.triggers} triggers  (${pctStr})`);
+    }
+    if (!printed) console.log(C.gray + '    (none)' + C.reset);
+    console.log('');
+    console.log(C.dim + '  top canceled/abandoned rules (needs clearer guidance):' + C.reset);
+    const friction = r.per_rule
+      .filter(rule => (rule.canceled || rule.abandoned))
+      .sort((a, b) => ((b.canceled || 0) + (b.abandoned || 0)) - ((a.canceled || 0) + (a.abandoned || 0)))
+      .slice(0, 5);
+    if (!friction.length) {
+      console.log(C.gray + '    (none)' + C.reset);
+    } else {
+      for (const rule of friction) {
+        const total = (rule.canceled || 0) + (rule.abandoned || 0);
+        const pctStr = Math.round(100 * total / rule.triggers).toString().padStart(3) + '%';
+        console.log(`    ${rule.pattern.padEnd(32)} ${total} canceled/abandoned / ${rule.triggers} triggers  (${pctStr})`);
+      }
     }
     console.log('');
   }
@@ -306,6 +324,9 @@ function printMetrics(r) {
     console.log(C.dim + `  cache (last ${r.range_days}d):` + C.reset);
     console.log(`    writes:   ${r.cache.writes}`);
     console.log(`    reads:    ${r.cache.reads} (${r.cache.read_hits} hits, ${r.cache.read_misses} misses — ${Math.round(100 * r.cache.hit_rate)}% hit rate)`);
+    if (r.cache.writes) {
+      console.log(`    reuse:    ${Math.round(100 * (r.cache.utilization_rate || 0))}% (${r.cache.read_hits} hit reads / ${r.cache.writes} writes)`);
+    }
     if (r.cache.gc_sweeps) {
       const mb = Math.round(r.cache.gc_bytes_freed / 1024 / 1024);
       console.log(`    gc sweeps: ${r.cache.gc_sweeps} (evicted ${r.cache.gc_evicted} files, ${mb}MB freed)`);

@@ -165,6 +165,44 @@ function handlePreCompact(input, config) {
   };
 }
 
+function splitShellArgs(s) {
+  const out = [];
+  const re = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  for (const m of String(s || '').matchAll(re)) out.push(m[1] ?? m[2] ?? m[3]);
+  return out;
+}
+
+function recursiveGrepExample(cmd) {
+  const m = String(cmd || '').match(/\b(?:e?grep)\s+(-[A-Za-z]*[rR][A-Za-z]*|--recursive)\s+(.+?)(?:\s+\||\s+2>&1|$)/);
+  if (!m) return null;
+  const args = splitShellArgs(m[2]);
+  const pattern = args.find(a => a && !a.startsWith('-')) || 'PATTERN';
+  const afterPattern = args.slice(args.indexOf(pattern) + 1);
+  const path = afterPattern.find(a => a && !a.startsWith('-')) || '.';
+  return `ctx_grep({pattern: ${JSON.stringify(pattern)}, path: ${JSON.stringify(path)}, limit_bytes: 2500})`;
+}
+
+function guidanceForRule(rule, toolInput = {}) {
+  const cmd = toolInput.command || '';
+  const match = String(rule?.match || '');
+  if (/e\?grep|grep|\\brg|rg/.test(match)) {
+    return recursiveGrepExample(cmd) || 'ctx_grep({pattern: "PATTERN", path: ".", limit_bytes: 2500})';
+  }
+  if (/cat|head|tail|var\/log/.test(match)) {
+    return 'ctx_read({path: "PATH", limit_bytes: 2500})';
+  }
+  if (/find|ls|tree|journalctl|dmesg|docker|kubectl|du|npm|pnpm|yarn|git|history|ps|awk|sed|wc/.test(match)) {
+    return `ctx_shell({command: ${JSON.stringify(cmd || 'COMMAND')}, limit_bytes: 2500})`;
+  }
+  return null;
+}
+
+function permissionReason(rule, toolInput, reason) {
+  const example = guidanceForRule(rule, toolInput);
+  if (!example) return `[ctx] ${reason}`;
+  return `[ctx] ${reason}\nExample tool call: ${example}\nDo not abandon: use the example tool call, or run a narrower bounded Bash command.`;
+}
+
 function handlePreToolUse(input, config) {
   // Working memory dedup branch (Phase 1)
   try {
@@ -288,7 +326,7 @@ function handlePreToolUse(input, config) {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: action,
-          permissionDecisionReason: `[ctx] ${reason}`,
+          permissionDecisionReason: permissionReason(rule, toolInput, reason),
         },
       },
       exitCode: 0,

@@ -273,6 +273,26 @@ test('pre-tool-use denies unbounded find from root with a reason', () => {
   assert.equal(out.hookEventName, 'PreToolUse');
   assert.equal(out.permissionDecision, 'deny');
   assert.match(out.permissionDecisionReason, /unbounded traversal/);
+  assert.match(out.permissionDecisionReason, /Example tool call: ctx_shell/);
+});
+
+test('pre-tool-use recursive grep deny includes concrete ctx_grep call', () => {
+  const cfg = configWithDirs();
+  cfg.hooks.pre_tool_use = {
+    enabled: true,
+    default_mode: 'deny',
+    rules: [
+      { tool: 'Bash', match: '\\b(?:e?grep)\\s+(?:-[A-Za-z]*[rR][A-Za-z]*\\b|--recursive\\b)', mode: 'deny', reason: 'recursive grep' },
+    ],
+  };
+  const res = handlePreToolUse({
+    tool_name: 'Bash',
+    tool_input: { command: 'cd /repo && grep -rn "AsyncStorage\\|persist" apps/mobile/store/ 2>&1 | head -20' },
+  }, cfg);
+  const reason = res.output.hookSpecificOutput.permissionDecisionReason;
+  assert.match(reason, /Example tool call: ctx_grep/);
+  assert.match(reason, /pattern: "AsyncStorage/);
+  assert.match(reason, /path: "apps\/mobile\/store\/"/);
 });
 
 test('pre-tool-use passes through when no rule matches', () => {

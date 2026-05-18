@@ -259,6 +259,8 @@ test('correlate: ask + unrelated Bash → canceled (pattern match required)', ()
   const r = correlate(records);
   assert.equal(r.pre_tool.ask.user_approved, 0);
   assert.equal(r.pre_tool.ask.canceled, 1);
+  assert.equal(r.per_rule[0].canceled, 1);
+  assert.equal(r.per_rule[0].canceled_rate, 1);
 });
 
 test('correlate: session=- events go to unscoped bucket, not correlated', () => {
@@ -300,7 +302,9 @@ test('aggregate produces full record shape on canonical fixture', () => {
   assert.equal(r.cache.read_hits, 1);
   assert.equal(r.cache.read_misses, 1);
   assert.equal(r.cache.hit_rate, 0.5);
+  assert.equal(r.cache.utilization_rate, 1);
   assert.equal(r.cache.gc_sweeps, 1);
+  assert.ok(r.working_memory);
   assert.equal(r.unscoped, 2);
   assert.equal(r.parse_errors, 1);
 });

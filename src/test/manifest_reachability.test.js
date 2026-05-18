@@ -16,6 +16,15 @@ function preToolUseBody() {
   return src.slice(start, end);
 }
 
+function postToolUseBody() {
+  const src = fs.readFileSync(path.join(ROOT, 'src', 'hooks.js'), 'utf8');
+  const start = src.indexOf('async function handlePostToolUse');
+  const end = src.indexOf('function handleUserPromptSubmit');
+  assert.ok(start >= 0, 'handlePostToolUse exists');
+  assert.ok(end > start, 'handleUserPromptSubmit follows handlePostToolUse');
+  return src.slice(start, end);
+}
+
 function toolNamesReferencedByPreToolHook() {
   const body = preToolUseBody();
   const names = new Set();
@@ -25,15 +34,24 @@ function toolNamesReferencedByPreToolHook() {
   return names;
 }
 
-function pluginPreToolMatchers() {
+function toolNamesReferencedByPostToolHook() {
+  const body = postToolUseBody();
+  const names = new Set();
+  for (const m of body.matchAll(/toolName\s*===\s*['"]([^'"]+)['"]/g)) {
+    names.add(m[1]);
+  }
+  return names;
+}
+
+function pluginMatchers(eventName) {
   const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
-  const groups = plugin?.hooks?.PreToolUse || [];
+  const groups = plugin?.hooks?.[eventName] || [];
   return new Set(groups.map(g => g.matcher || '*'));
 }
 
 test('plugin PreToolUse manifest reaches every tool-specific pre-tool branch', () => {
   const referenced = toolNamesReferencedByPreToolHook();
-  const matchers = pluginPreToolMatchers();
+  const matchers = pluginMatchers('PreToolUse');
 
   assert.ok(referenced.has('Read'), 'sentinel: Read pre-tool branch is discovered');
   assert.ok(referenced.has('Bash'), 'sentinel: Bash pre-tool branch is discovered');
@@ -44,5 +62,21 @@ test('plugin PreToolUse manifest reaches every tool-specific pre-tool branch', (
     missing,
     [],
     `plugin.json PreToolUse matchers do not reach hook branches for: ${missing.join(', ')}`,
+  );
+});
+
+test('plugin PostToolUse manifest reaches every tool-specific post-tool branch', () => {
+  const referenced = toolNamesReferencedByPostToolHook();
+  const matchers = pluginMatchers('PostToolUse');
+
+  assert.ok(referenced.has('Read'), 'sentinel: Read post-tool branch is discovered');
+  assert.ok(referenced.has('Bash'), 'sentinel: Bash post-tool branch is discovered');
+
+  if (matchers.has('*')) return;
+  const missing = [...referenced].filter(name => !matchers.has(name));
+  assert.deepEqual(
+    missing,
+    [],
+    `plugin.json PostToolUse matchers do not reach hook branches for: ${missing.join(', ')}`,
   );
 });
