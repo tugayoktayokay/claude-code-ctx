@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.13] — 2026-05-21
+
+### Fixed
+- **Read-dedup was 100% dead since it shipped — the working-memory `reads` store was never populated.** The PostToolUse recorder read file content from `tool_response.content`, but the native Read hook payload nests it under `tool_response.file.content` (captured live: `keys=type+file`, `content=undefined`, `file.content=string`). So `body` was always null, `recordRead` never ran, `reads:{}` stayed empty across all sessions (0 reads recorded vs 530 bash calls), and read-dedup could never fire. Bash dedup was unaffected (uses top-level `.stdout`). The unit test used `tool_response:{content}` — the wrong shape — so it stayed green while production recorded nothing (the same "test encodes the bug" class as v0.8.12).
+  - `hooks.js` now extracts read content from both `tool_response.content` and `tool_response.file.content`.
+  - Added a regression test using the real captured payload shape; verified end-to-end through `bin/ctx hook post-tool-use` (real-shaped Read now records into the store).
+
 ## [v0.8.12] — 2026-05-21
 
 ### Fixed

@@ -866,6 +866,44 @@ test('PostToolUse Read records content in working memory', async () => {
   }
 });
 
+test('PostToolUse Read records content from the real {type, file:{content}} hook payload', async () => {
+  // Regression: the native Read hook payload nests content under
+  // tool_response.file.content (captured live: keys=type+file, content=undefined,
+  // file.content=string). Recording read tr2.content alone left `reads` empty
+  // forever, so read-dedup never fired. This asserts the real shape is recorded.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-realshape-'));
+  const targetFile = path.join(tmp, 'README.md');
+  const content = 'z'.repeat(1500);
+  fs.writeFileSync(targetFile, content);
+  process.env.CTX_WORKING_MEMORY_DIR = path.join(tmp, 'wm');
+
+  try {
+    const cfg = configWithDirs();
+    cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1024, recency_window_minutes: 10, ttl_hours: 24 };
+
+    const sid = 'sid-realshape';
+    await handlePostToolUse(
+      {
+        session_id: sid,
+        tool_name: 'Read',
+        tool_input: { file_path: targetFile },
+        tool_response: { type: 'text', file: { filePath: targetFile, content, numLines: 1, startLine: 1, totalLines: 1 } },
+      },
+      cfg,
+    );
+
+    const wm = require('../working_memory.js');
+    const last = wm.lookupLatestRead(sid, targetFile);
+    assert.ok(last, 'read from real {file:{content}} payload must be recorded');
+    assert.equal(last.size, 1500);
+    assert.equal(last.hash, wm.hashContent(content));
+    assert.equal(wm.readBlob(sid, last.hash), content);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    delete process.env.CTX_WORKING_MEMORY_DIR;
+  }
+});
+
 test('PreToolUse Read: dedup does NOT fire when prior read is older than recency window', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-stale-'));
   const targetFile = path.join(tmp, 'CLAUDE.md');

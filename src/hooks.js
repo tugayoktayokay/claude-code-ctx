@@ -410,7 +410,12 @@ async function handlePostToolUse(input, config) {
       if (wmCfg?.enabled && toolName === 'Read') {
         const filePath = ti.file_path || '';
         const tr2 = input.tool_response;
-        const body = (tr2 && typeof tr2.content === 'string') ? tr2.content : null;
+        // Native Read hook payload nests content under tool_response.file.content
+        // ({type:'text', file:{content,...}}); older/other shapes use top-level
+        // .content. Read both, else nothing records and read-dedup stays dead.
+        const body = (tr2 && typeof tr2.content === 'string') ? tr2.content
+                   : (tr2 && tr2.file && typeof tr2.file.content === 'string') ? tr2.file.content
+                   : null;
         const sidRec = String(input.session_id || '-');
         if (filePath && body !== null && sidRec !== '-') {
           const wm = require('./working_memory.js');
