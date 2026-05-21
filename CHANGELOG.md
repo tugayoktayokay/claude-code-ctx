@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.12] — 2026-05-21
+
+### Fixed
+- **Test corpus runs polluted the real `ctx metrics` obey rate.** `real_commands.test.js` called `handlePreToolUse` with synthetic session ids (`curated-corpus` / `regression-corpus`) without redirecting `$HOME`. `logHook` resolves `os.homedir()` at runtime, so every `node --test` run appended ~150 synthetic deny/ask events — with no obey follow-up — into the real `~/.config/ctx/hooks.log`. That dragged the reported deny obey rate down to 16% (84% "abandoned") and ask approval to 5%, firing two false `ctx doctor` drift warnings. The true rates on real sessions are ~75% obey / ~80% approve. Same class of metric-pollution bug as the v0.8.11 cache-write fix, now closed on the obey-rate side.
+  - `real_commands.test.js` now uses file-level `$HOME` isolation (mirrors `hooks.test.js`), plus a regression test asserting synthetic corpus sessions never leak into the real log.
+  - `hooks.test.js` already had this isolation and a guard test; the corpus suite added in v0.8.5/v0.8.7 was missing it.
+
 ## [v0.8.11] — 2026-05-18
 
 ### Fixed
