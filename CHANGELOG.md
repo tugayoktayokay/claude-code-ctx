@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.14] — 2026-05-22
+
+### Changed
+- **`ctx savings` now separates *measured* bytes from the *estimated* token figure.** The byte counts — cache-hit bytes plus read-dedup and bash-dedup `bytes_saved` — are real measurements; only the bytes→tokens conversion is a heuristic (~4 B/tok). The old output labeled the whole thing `estimated saved: N tokens`, hiding that the underlying bytes are measured. New format shows a `measured (bytes that did NOT re-enter context)` section broken down by source (cache reuse / read dedup / bash dedup / total measured), then a derived `≈ N tokens (… byte counts measured, token figure estimated)` line. `estimateSavings` now returns `wm_read_bytes` / `wm_bash_bytes` split so read- and bash-dedup contributions are visible separately (read-dedup started contributing as of v0.8.13).
+
 ## [v0.8.13] — 2026-05-21
 
 ### Fixed

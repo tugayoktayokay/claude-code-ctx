@@ -9,6 +9,10 @@ function tokensForBytes(bytes) {
   return Math.round((Number(bytes) || 0) / 4);
 }
 
+function kb(bytes) {
+  return `${((Number(bytes) || 0) / 1024).toFixed(1)} KB`;
+}
+
 function estimateSavings(logPath = path.join(os.homedir(), '.config', 'ctx', 'hooks.log'), opts = {}) {
   if (!fs.existsSync(logPath)) {
     return { range_days: opts.rangeDays || 7, cache_saved_tokens: 0, wm_saved_tokens: 0, total_saved_tokens: 0, cache: {}, working_memory: {} };
@@ -25,11 +29,14 @@ function estimateSavings(logPath = path.join(os.homedir(), '.config', 'ctx', 'ho
   for (const r of cacheReads) {
     cacheHitBytes += writeBytesByRef.get(r.ref) || Number(r.bytes || 0);
   }
-  let wmBytes = 0;
+  let wmReadBytes = 0;
+  let wmBashBytes = 0;
   for (const r of inRange) {
     if (r.evType !== 'working_memory') continue;
-    if (r.action === 'dedup_hit' || r.action === 'bash_dedup_hit') wmBytes += Number(r.bytes_saved || 0);
+    if (r.action === 'dedup_hit') wmReadBytes += Number(r.bytes_saved || 0);
+    else if (r.action === 'bash_dedup_hit') wmBashBytes += Number(r.bytes_saved || 0);
   }
+  const wmBytes = wmReadBytes + wmBashBytes;
   const cacheSavedTokens = tokensForBytes(cacheHitBytes);
   const wmSavedTokens = tokensForBytes(wmBytes);
   const cache = metrics.aggregateCache(inRange);
@@ -38,6 +45,8 @@ function estimateSavings(logPath = path.join(os.homedir(), '.config', 'ctx', 'ho
     range_days: rangeDays,
     cache_hit_bytes: cacheHitBytes,
     working_memory_bytes_saved: wmBytes,
+    wm_read_bytes: wmReadBytes,
+    wm_bash_bytes: wmBashBytes,
     cache_saved_tokens: cacheSavedTokens,
     wm_saved_tokens: wmSavedTokens,
     total_saved_tokens: cacheSavedTokens + wmSavedTokens,
@@ -51,18 +60,32 @@ function formatSavings(s) {
   const hintWrites = s.cache?.hint_writes ?? s.cache?.writes ?? 0;
   const autoWrites = s.cache?.auto_writes || 0;
   const unknownWrites = s.cache?.unknown_writes || 0;
+  const cacheBytes = s.cache_hit_bytes || 0;
+  const readBytes = s.wm_read_bytes || 0;
+  const bashBytes = s.wm_bash_bytes || 0;
+  const totalBytes = cacheBytes + readBytes + bashBytes;
+  const readHits = s.cache?.read_hits || 0;
+  const readDedupHits = s.working_memory?.dedup_hits || 0;
+  const bashDedupHits = s.working_memory?.bash_dedup_hits || 0;
+  const row = (label, val) => `    ${(label + ':').padEnd(15)} ${val}`;
+  const hits = (n) => `${n} hit${n === 1 ? '' : 's'}`;
+
   lines.push('');
   lines.push(`  ctx savings — last ${s.range_days} days`);
   lines.push('');
-  lines.push(`  estimated saved: ${s.total_saved_tokens.toLocaleString()} tokens`);
-  lines.push(`    cache reuse:    ${s.cache_saved_tokens.toLocaleString()} tokens (${s.cache?.read_hits || 0} hit reads / ${hintWrites} recallable writes)`);
+  lines.push('  measured (bytes that did NOT re-enter context):');
+  lines.push(`${row('cache reuse', kb(cacheBytes))}  (${readHits} hit reads / ${hintWrites} recallable writes)`);
+  lines.push(`${row('read dedup', kb(readBytes))}  (${hits(readDedupHits)})`);
+  lines.push(`${row('bash dedup', kb(bashBytes))}  (${hits(bashDedupHits)})`);
   if (autoWrites || unknownWrites) {
     const breakdown = [];
     if (autoWrites) breakdown.push(`${autoWrites} auto post_tool`);
     if (unknownWrites) breakdown.push(`${unknownWrites} pre-0.8.11`);
-    lines.push(`      (excluded from rate: ${breakdown.join(', ')})`);
+    lines.push(`      (cache writes excluded from reuse rate: ${breakdown.join(', ')})`);
   }
-  lines.push(`    working memory: ${s.wm_saved_tokens.toLocaleString()} tokens (${(s.working_memory?.dedup_hits || 0) + (s.working_memory?.bash_dedup_hits || 0)} dedup hits)`);
+  lines.push(row('total measured', kb(totalBytes)));
+  lines.push('');
+  lines.push(`  ≈ ${s.total_saved_tokens.toLocaleString()} tokens  (derived at ~4 B/tok — byte counts measured, token figure estimated)`);
   if (hintWrites > 0) {
     lines.push(`    cache reuse rate: ${Math.round(100 * (s.cache?.utilization_rate || 0))}%`);
   }
