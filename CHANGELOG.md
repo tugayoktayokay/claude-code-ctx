@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.8.15] — 2026-05-22
+
+### Added
+- **`ctx doctor` now detects a silently-dead recorder.** New `Working memory recording` drift check: when `working_memory` is enabled and bash-call recording is clearly active (≥ `wm_recording_min_bash`, default 10) but **zero reads** are recorded in the store, it warns that read content isn't being captured (a `tool_response` shape mismatch — exactly the v0.8.13 read-dedup bug). The pre-existing coarse "no working_memory events" check missed this because bash activity masked it. Pure `recordingDriftWarning` + store scanner `sumWorkingMemoryStore`; threshold is config-tunable under `doctor.drift`.
+
 ## [v0.8.14] — 2026-05-22
 
 ### Changed

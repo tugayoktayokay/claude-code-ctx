@@ -211,8 +211,43 @@ const DRIFT_DEFAULTS = {
   ask_min_total: 5,
   ask_cancel_threshold: 0.5,
   cache_min_writes: 10,
+  wm_recording_min_bash: 10,
   range_days: 7,
 };
+
+// Pure: detect a silently-dead recorder. When working_memory is enabled and
+// bash-call recording is clearly active (>= minBash) but zero reads have been
+// recorded, the read recorder is almost certainly broken (e.g. a tool_response
+// shape mismatch) rather than idle. Coarse "zero wm events" checks miss this
+// because bash activity masks it.
+function recordingDriftWarning({ enabled, readsRecorded, bashRecorded, minBash }) {
+  if (!enabled) return null;
+  if ((bashRecorded || 0) >= minBash && (readsRecorded || 0) === 0) {
+    return `${bashRecorded} bash calls recorded but 0 reads in the working_memory store — read content is not being captured (tool_response shape mismatch?), so read-dedup cannot fire`;
+  }
+  return null;
+}
+
+// Sum reads/bash_calls across recent working_memory session files.
+function sumWorkingMemoryStore(dir, since = 0) {
+  let reads = 0;
+  let bash = 0;
+  let sessions = 0;
+  try {
+    for (const n of fs.readdirSync(dir)) {
+      if (!n.endsWith('.json')) continue;
+      const full = path.join(dir, n);
+      try {
+        if (since && fs.statSync(full).mtimeMs < since) continue;
+        const j = JSON.parse(fs.readFileSync(full, 'utf8'));
+        reads += Object.keys(j.reads || {}).length;
+        bash += Object.keys(j.bash_calls || {}).length;
+        sessions += 1;
+      } catch { /* skip unreadable/partial file */ }
+    }
+  } catch { /* dir missing */ }
+  return { reads, bash, sessions };
+}
 
 function driftThresholds(config) {
   const cfg = config?.doctor?.drift || {};
@@ -247,6 +282,21 @@ function checkRuntimeDrift() {
   const wmEvents = (wm.dedup_hits || 0) + (wm.recall_calls || 0) + (wm.bash_dedup_hits || 0);
   if (config?.working_memory?.enabled && record.pre_tool?.total > 0 && wmEvents === 0) {
     out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: `working_memory enabled but no working_memory events in last ${t.range_days}d` });
+  }
+
+  // Granular: a recorder can be silently dead while bash activity masks the
+  // coarse check above (read-dedup death, v0.8.13). Scan the store directly.
+  if (config?.working_memory?.enabled) {
+    const wmDir = process.env.CTX_WORKING_MEMORY_DIR
+      || path.join(os.homedir(), '.config', 'ctx', 'working_memory');
+    const store = sumWorkingMemoryStore(wmDir, Date.now() - t.range_days * 86_400_000);
+    const recDetail = recordingDriftWarning({
+      enabled: true,
+      readsRecorded: store.reads,
+      bashRecorded: store.bash,
+      minBash: t.wm_recording_min_bash,
+    });
+    if (recDetail) out.push({ ...CHECKS.warn, label: 'Working memory recording', detail: recDetail });
   }
 
   const deny = record.pre_tool?.deny || {};
@@ -371,4 +421,4 @@ function checkLogRotation() {
   }
 }
 
-module.exports = { runChecks, CHECKS, checkFeatureWiring, checkRuntimeDrift, checkPluginVersionDrift, localPackageVersion };
+module.exports = { runChecks, CHECKS, checkFeatureWiring, checkRuntimeDrift, checkPluginVersionDrift, localPackageVersion, recordingDriftWarning, sumWorkingMemoryStore };

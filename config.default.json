@@ -102,6 +102,7 @@
       "ask_min_total": 5,
       "ask_cancel_threshold": 0.5,
       "cache_min_writes": 10,
+      "wm_recording_min_bash": 10,
       "range_days": 7
     }
   },

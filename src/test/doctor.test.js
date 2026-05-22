@@ -54,6 +54,13 @@ function withDoctorFixture(matchers, fn, opts = {}) {
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
     fs.writeFileSync(logPath, opts.hooksLog);
   }
+  if (opts.store) {
+    const wmDir = path.join(tmpHome, '.config', 'ctx', 'working_memory');
+    fs.mkdirSync(wmDir, { recursive: true });
+    for (const [sid, state] of Object.entries(opts.store)) {
+      fs.writeFileSync(path.join(wmDir, `${sid}.json`), JSON.stringify(state));
+    }
+  }
 
   try {
     const doctor = require('../doctor.js');
@@ -111,6 +118,42 @@ test('doctor warns when installed plugin version differs from source version', (
     assert.equal(rows[0].level, 'warn');
     assert.match(rows[0].detail, /installed vtest, source v/);
   });
+});
+
+test('recordingDriftWarning flags enabled wm with bash activity but zero reads recorded', () => {
+  const doctor = require('../doctor.js');
+  // silent recorder death: bash recording works, reads never land
+  assert.ok(doctor.recordingDriftWarning({ enabled: true, readsRecorded: 0, bashRecorded: 30, minBash: 10 }));
+  // healthy: reads are being captured
+  assert.equal(doctor.recordingDriftWarning({ enabled: true, readsRecorded: 4, bashRecorded: 30, minBash: 10 }), null);
+  // too little bash activity to conclude anything
+  assert.equal(doctor.recordingDriftWarning({ enabled: true, readsRecorded: 0, bashRecorded: 3, minBash: 10 }), null);
+  // feature disabled: never warn
+  assert.equal(doctor.recordingDriftWarning({ enabled: false, readsRecorded: 0, bashRecorded: 30, minBash: 10 }), null);
+});
+
+test('doctor warns when working_memory records bash calls but never reads (silent recorder death)', () => {
+  const hooksLog = '2026-05-18T10:00:00.000Z pre_tool session=S action=deny tool=Bash pattern="^grep" cmd_head="grep -r foo ." reason="recursive"\n';
+  const bash = {};
+  for (let i = 0; i < 15; i++) bash[`/cwd|cmd${i}`] = [{ turn: i, cmd_norm: `cmd${i}` }];
+  const store = { sessA: { session_id: 'sessA', next_turn: 16, reads: {}, bash_calls: bash } };
+  withDoctorFixture(['Bash', 'Read'], (doctor) => {
+    const rows = doctor.checkRuntimeDrift();
+    assert.ok(rows.some(r => r.label === 'Working memory recording' && r.level === 'warn'),
+      `expected recorder-death warn; got: ${rows.map(r => r.label).join(',')}`);
+  }, { hooksLog, store });
+});
+
+test('doctor does NOT warn recorder-death when reads are being recorded', () => {
+  const hooksLog = '2026-05-18T10:00:00.000Z pre_tool session=S action=deny tool=Bash pattern="^grep" cmd_head="grep -r foo ." reason="recursive"\n';
+  const bash = {};
+  for (let i = 0; i < 15; i++) bash[`/cwd|cmd${i}`] = [{ turn: i, cmd_norm: `cmd${i}` }];
+  const store = { sessA: { session_id: 'sessA', next_turn: 16, reads: { '/a.md': [{ turn: 1, hash: 'x', size: 9 }] }, bash_calls: bash } };
+  withDoctorFixture(['Bash', 'Read'], (doctor) => {
+    const rows = doctor.checkRuntimeDrift();
+    assert.ok(!rows.some(r => r.label === 'Working memory recording'),
+      `expected no recorder-death warn; got: ${rows.map(r => r.label).join(',')}`);
+  }, { hooksLog, store });
 });
 
 test('doctor drift thresholds honor config.doctor.drift overrides', () => {
