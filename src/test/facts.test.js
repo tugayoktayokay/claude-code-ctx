@@ -129,6 +129,74 @@ test('extractFromPrompt disabled by config flag', () => {
   assert.equal(facts.readFacts(CWD, cfg).length, 0);
 });
 
+test('harvestSnapshots lifts decision + failed bullets from snapshot bodies into facts', () => {
+  const memDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-harvest-'));
+  const cfg = { facts_dir: path.join(memDir, 'facts') };
+  fs.writeFileSync(path.join(memDir, 'snap1.md'), [
+    '---',
+    'name: snap one',
+    '---',
+    '',
+    '**Decisions made:**',
+    '- decided to use Postgres for analytics because OLAP queries are heavy',
+    '- avoid global mutable state in the analyzer module',
+    '',
+    '**Failed attempts / open questions:**',
+    '- tried in-memory cache, it failed under concurrent load',
+    '',
+    '**Context snapshot:**',
+    '- 42% of ceiling',
+  ].join('\n'));
+  // MEMORY.md must be skipped
+  fs.writeFileSync(path.join(memDir, 'MEMORY.md'), '- [snap1](snap1.md) — index line\n');
+
+  const res = facts.harvestSnapshots(memDir, CWD, cfg, {});
+  assert.equal(res.scanned, 1);
+  assert.ok(res.extracted >= 3, `expected >=3 facts, got ${res.extracted}`);
+  const stored = facts.readFacts(CWD, cfg);
+  assert.ok(stored.some(f => f.kind === 'decision' && /Postgres/.test(f.text)));
+  assert.ok(stored.some(f => f.kind === 'bug' && /concurrent load/.test(f.text)));
+  assert.ok(stored.every(f => f.source === 'harvest'));
+});
+
+test('harvestSnapshots drops markdown-header bullets and dedups across sections', () => {
+  const memDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-harvest-'));
+  const cfg = { facts_dir: path.join(memDir, 'facts') };
+  const shared = 'we must avoid recomputing the analyzer token max on every entry';
+  fs.writeFileSync(path.join(memDir, 'snap.md'), [
+    '**Decisions made:**',
+    '## 🎯 critical finding section header that is really assistant prose',
+    `- ${shared}`,
+    '',
+    '**Failed attempts / open questions:**',
+    `- ${shared}`,
+    '',
+  ].join('\n'));
+  const res = facts.harvestSnapshots(memDir, CWD, cfg, {});
+  const stored = facts.readFacts(CWD, cfg);
+  // header line is not a bullet → not captured; shared line appears once (decision wins)
+  assert.equal(stored.filter(f => f.text.includes('recomputing the analyzer')).length, 1);
+  assert.equal(stored[0].kind, 'decision');
+  assert.ok(!stored.some(f => /🎯|^#/.test(f.text)));
+});
+
+test('harvestSnapshots skips noise bullets and is idempotent', () => {
+  const memDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-harvest-'));
+  const cfg = { facts_dir: path.join(memDir, 'facts') };
+  fs.writeFileSync(path.join(memDir, 'snap.md'), [
+    '**Decisions made:**',
+    '- decided to gate passive extraction behind a config flag',
+    '- Base directory for this skill: /tmp/junk',
+    '',
+  ].join('\n'));
+  const first = facts.harvestSnapshots(memDir, CWD, cfg, {});
+  const countAfterFirst = facts.readFacts(CWD, cfg).length;
+  const second = facts.harvestSnapshots(memDir, CWD, cfg, {});
+  const countAfterSecond = facts.readFacts(CWD, cfg).length;
+  assert.equal(countAfterFirst, countAfterSecond, 'harvest must be idempotent');
+  assert.ok(!facts.readFacts(CWD, cfg).some(f => /Base directory for this skill/.test(f.text)));
+});
+
 test('auditFacts reports low_quality count', () => {
   const cfg = tmpConfig();
   facts.rememberFact(CWD, 'decided to use Postgres', cfg, { kind: 'decision' });

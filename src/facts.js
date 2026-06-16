@@ -244,6 +244,63 @@ function extractFromPrompt(cwd, prompt, config = {}, opts = {}) {
   return { extracted: 1, fact, total };
 }
 
+// Pull the `- ` bullet lines under a `**<header>:**` block until the next
+// blank line or section header.
+function sectionBullets(markdown, header) {
+  const lines = String(markdown || '').split('\n');
+  const out = [];
+  let inSection = false;
+  const headRe = new RegExp(`^\\*\\*${header.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}:?\\*\\*`, 'i');
+  for (const line of lines) {
+    if (headRe.test(line.trim())) { inSection = true; continue; }
+    if (!inSection) continue;
+    const m = line.match(/^\s*[-*]\s+(.*)$/);
+    if (m) { out.push(m[1].trim()); continue; }
+    if (line.trim() === '' || /^\*\*/.test(line.trim())) break;
+  }
+  return out;
+}
+
+// One-time migration: lift real decisions / failed attempts out of existing
+// snapshot blobs into the granular fact store. Quality-gated + deduped by
+// writeFacts, so re-running is idempotent.
+function harvestSnapshots(memoryDir, cwd, config = {}, opts = {}) {
+  let names = [];
+  try { names = fs.readdirSync(memoryDir); } catch { return { scanned: 0, extracted: 0, total: readFacts(cwd, config).length }; }
+  const harvested = [];
+  const seenText = new Set(); // cross-kind, cross-file dedup of prose dumps
+  let scanned = 0;
+  for (const name of names) {
+    if (!name.endsWith('.md') || name === 'MEMORY.md') continue;
+    let md = '';
+    try { md = fs.readFileSync(path.join(memoryDir, name), 'utf8'); } catch { continue; }
+    scanned++;
+    const ts = opts.ts || new Date().toISOString();
+    const add = (kind, raw) => {
+      const text = normalizeText(raw, 240);
+      if (!text || text.length < 12 || isNoisyFactText(text)) return;
+      // Snapshot bullets are often assistant prose, not atomic decisions:
+      // drop markdown headers and overlapping decision/failed dumps.
+      if (/^[#>]/.test(text)) return;
+      const key = text.toLowerCase().slice(0, 120);
+      if (seenText.has(key)) return;
+      seenText.add(key);
+      const q = factQuality(kind, text);
+      if (q < Number(config?.memory?.prune_quality_below ?? 0.25)) return;
+      harvested.push({
+        id: factId(cwd, kind, text), cwd, kind, text,
+        paths: extractPaths(text), source: 'harvest', ts,
+        weight: factWeight(kind, text), quality: q, seen: 1,
+      });
+    };
+    // Decisions first so a line shared with "Failed attempts" keeps the better kind.
+    for (const d of sectionBullets(md, 'Decisions made')) add('decision', d);
+    for (const f of sectionBullets(md, 'Failed attempts / open questions')) add('bug', f);
+  }
+  const total = writeFacts(cwd, harvested, config);
+  return { scanned, extracted: harvested.length, total, path: factPathFor(cwd, config) };
+}
+
 function pruneFacts(cwd, config = {}, opts = {}) {
   const threshold = Number(opts.qualityBelow ?? config?.memory?.prune_quality_below ?? 0.25);
   const all = readFacts(cwd, config);
@@ -324,6 +381,8 @@ module.exports = {
   recallFacts,
   buildRecall,
   extractFromPrompt,
+  harvestSnapshots,
+  sectionBullets,
   pruneFacts,
   auditFacts,
 };

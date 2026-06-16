@@ -61,7 +61,8 @@ Analysis + memory:
   ctx recall "<query>"               Recall matching facts (ranked by relevance + quality)
   ctx forget "<text>" [--exact|--id ID] [--yes]
                                      Remove facts; dry-run unless --yes
-  ctx facts [list|audit|prune]       Inspect / clean the fact store (prune --quality-below S --yes)
+  ctx facts [list|audit|prune|harvest]
+                                     Inspect/clean facts; harvest = lift decisions from old snapshots
   ctx history [N]                    Last N sessions (default 10)
   ctx prune [--apply] [--older-than 30d] [--keep-last 20] [--noise-only] [--per-project]
                                      Clean memory dir; dry-run by default
@@ -819,6 +820,12 @@ function runFacts(args, config) {
     }
     return 0;
   }
+  if (sub === 'harvest') {
+    const memoryDir = resolveMemoryDir(process.cwd(), config);
+    const res = facts.harvestSnapshots(memoryDir, process.cwd(), config, {});
+    console.log(`✓ harvested ${res.extracted} fact(s) from ${res.scanned} snapshot(s) · ${res.total} facts total`);
+    return 0;
+  }
   if (sub === 'list' || sub === undefined) {
     const all = facts.readFacts(process.cwd(), config);
     if (opts.json) { process.stdout.write(JSON.stringify(all, null, 2) + '\n'); return 0; }
@@ -828,7 +835,7 @@ function runFacts(args, config) {
     }
     return 0;
   }
-  console.error('usage: ctx facts [list|audit|prune] [--json] [--quality-below S] [--yes]');
+  console.error('usage: ctx facts [list|audit|prune|harvest] [--json] [--quality-below S] [--yes]');
   return 1;
 }
 

@@ -100,7 +100,7 @@ const memoryTools = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list', 'audit', 'prune'], description: 'Default list.' },
+        action: { type: 'string', enum: ['list', 'audit', 'prune', 'harvest'], description: 'Default list. harvest = lift decisions from existing snapshots into facts.' },
         quality_below: { type: 'number', description: 'Prune bar (default 0.25).' },
         apply: { type: 'boolean', description: 'For prune: actually delete (default false = dry-run).' },
       },
@@ -110,6 +110,10 @@ const memoryTools = [
       const cwd = process.cwd();
       const action = args.action || 'list';
       if (action === 'audit') return okText(facts.auditFacts(cwd, config, {}));
+      if (action === 'harvest') {
+        const res = facts.harvestSnapshots(resolveMemoryDir(cwd, config), cwd, config, {});
+        return okText(`harvested ${res.extracted} fact(s) from ${res.scanned} snapshot(s) (${res.total} total)`);
+      }
       if (action === 'prune') {
         const res = facts.pruneFacts(cwd, config, { qualityBelow: args.quality_below, dryRun: !args.apply });
         return okText(`${res.dryRun ? 'dry-run: would remove' : 'pruned'} ${res.removed} of ${res.before} facts (quality < ${res.quality_below})`);
