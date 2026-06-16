@@ -1,0 +1,25 @@
+src/test/analyzer.test.js
+  s_dc4af255a437e0::t_d2ca13dca7b291 56-77,79-81
+  s_dc4af255a437e0::t_9560d7d02a4c3d 78
+  s_dc4af255a437e0::t_949ea778ed25e1 7
+src/analyzer.js
+  s_dc4af255a437e0::t_ffb32df9c2108a 165-168,170-171
+  s_dc4af255a437e0::t_cf5bc3d47c82ea 285
+  s_dc4af255a437e0::t_9d003b81402de0 32-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "bcebed6baa1e82ce2138a1915d4d7689a4998f8f",
+  "prompts": {},
+  "sessions": {
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
