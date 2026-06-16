@@ -165,7 +165,7 @@ ctx bloat                    # system-prompt footprint audit
 ctx usage --tools --days 30  # tool usage across sessions
 ctx report --out file.html   # self-contained HTML report
 ctx restore --list           # list JSONL backups
-ctx prune [--apply]          # memory dir cleanup
+ctx prune [--apply]          # memory dir cleanup (age/quota + injected-intent noise)
 ctx doctor                   # 9 health checks
 ctx status                   # install + config state
 ctx metrics                  # pre_tool redirect compliance + cache stats

@@ -14,6 +14,21 @@ const CRITICAL_PATTERNS = [
   { re: /olmadı|çalışmadı|denedik|başarısız|didn['t\s]*work|failed/i, label: 'failed attempt' },
 ];
 
+const INJECTED_USER_PATTERNS = [
+  /^\s*Base directory for this skill:/i,
+  /^\s*<system-reminder>/i,
+  /\b(UserPromptSubmit|PostToolUse|PreToolUse|SessionStart|Stop)\s+hook\b/i,
+  /\bhook context:/i,
+  /\bcaveman\b.*\bhook\b/i,
+  /CAVEMAN MODE ACTIVE/i,
+];
+
+function isInjectedUserText(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  return INJECTED_USER_PATTERNS.some(re => re.test(t));
+}
+
 function categorize(text, categories, map) {
   const lower = text.toLowerCase();
   for (const [key, cat] of Object.entries(categories)) {
@@ -101,8 +116,9 @@ function analyzeEntries(entries, config) {
       analysis.messageCount++;
       turn++;
       const text = extractText(entry.message?.content);
-      analysis.lastUserMessage = text.slice(0, 120);
-      if (text.length > 10) {
+      const isInjected = isInjectedUserText(text);
+      if (!isInjected) analysis.lastUserMessage = text.slice(0, 120);
+      if (!isInjected && text.length > 10) {
         analysis.userIntents.push(text.slice(0, 120));
         categorize(text, categories, analysis.activeCategories);
         extractCritical(text, analysis.criticalBits);
@@ -239,4 +255,5 @@ function recordToolUse(analysis, toolName, input) {
 module.exports = {
   analyzeEntries,
   CRITICAL_PATTERNS,
+  isInjectedUserText,
 };

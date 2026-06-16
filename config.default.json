@@ -113,7 +113,8 @@
   },
   "prune": {
     "default_older_than": "30d",
-    "default_keep_last": 20
+    "default_keep_last": 20,
+    "noisy_snapshots": true
   },
   "retrieval": {
     "weights": { "category": 0.5, "keyword": 0.3, "recency": 0.2 },
@@ -122,6 +123,16 @@
     "top_n": 3,
     "max_candidates": 2000,
     "scan_timeout_ms": 2000
+  },
+  "memory": {
+    "passive_prompt_extraction": true,
+    "prune_quality_below": 0.25,
+    "min_score": 0.6,
+    "top_n": 5,
+    "recency_half_life_days": 45,
+    "path_boost": 1.5,
+    "stale_days": 90,
+    "max_facts": 1000
   },
   "stopwords": {
     "tr": ["ve","bir","bu","ne","nasıl","için","ile","mi","mu","ama","fakat","ki","o","şu","da","de","ya","mı","şöyle","böyle"],

@@ -97,7 +97,7 @@ test('doctor warns when runtime metrics show enabled features are unused', () =>
     '2026-05-18T10:10:00.000Z cache-write ref=jjj bytes=14000 source=mcp',
   ].join('\n');
   withDoctorFixture(['Bash', 'Read'], (doctor) => {
-    const rows = doctor.checkRuntimeDrift();
+    const rows = doctor.checkRuntimeDrift({ now: Date.parse('2026-05-18T11:00:00Z') });
     assert.ok(rows.some(r => r.label === 'Runtime drift' && r.level === 'warn'));
     assert.ok(rows.some(r => r.label === 'Cache reuse' && r.level === 'warn'));
   }, { hooksLog });
@@ -165,7 +165,7 @@ test('doctor drift thresholds honor config.doctor.drift overrides', () => {
     '2026-05-18T10:03:00.000Z cache-write ref=d bytes=5000 source=mcp',
   ].join('\n');
   withDoctorFixture(['Bash', 'Read'], (doctor) => {
-    const rows = doctor.checkRuntimeDrift();
+    const rows = doctor.checkRuntimeDrift({ now: Date.parse('2026-05-18T11:00:00Z') });
     assert.ok(rows.some(r => r.label === 'Cache reuse' && r.level === 'warn'),
       `expected Cache reuse warn at lowered threshold; got: ${rows.map(r=>r.label).join(',')}`);
   }, { hooksLog, configOverlay: { doctor: { drift: { cache_min_writes: 3 } } } });

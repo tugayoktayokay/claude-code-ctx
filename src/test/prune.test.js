@@ -6,7 +6,7 @@ const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
 
-const { parseDuration, planPrune, applyPrune, planFromOpts } = require('../prune.js');
+const { parseDuration, planPrune, applyPrune, planFromOpts, isNoisySnapshotFile } = require('../prune.js');
 
 function setupFixture(ages) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-prune-'));
@@ -91,6 +91,86 @@ test('applyPrune removes files AND rewrites MEMORY.md; hand-written lines preser
     assert.match(idx, /project_fresh/);
     assert.match(idx, /user note/, 'hand-written line preserved');
     assert.match(idx, /# My memory/, 'headers preserved');
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('planPrune marks injected-intent snapshots as noisy and applyPrune rewrites index', () => {
+  const { base, memoryDir } = setupFixture([
+    ['project_test_base_directory_for_this_skill.md', 60_000],
+    ['project_real_feature.md', 30_000],
+  ]);
+  const noisyPath = path.join(memoryDir, 'project_test_base_directory_for_this_skill.md');
+  fs.writeFileSync(noisyPath, [
+    '---',
+    'name: ctx snapshot - test base directory for this skill',
+    'description: snapshot - last: "Base directory for this skill: /tmp/skill"',
+    '---',
+    '',
+    '**Last task:** "Base directory for this skill: /tmp/skill"',
+  ].join('\n'));
+
+  try {
+    assert.equal(isNoisySnapshotFile({ name: path.basename(noisyPath), path: noisyPath }), true);
+    const plan = planPrune(memoryDir, { pruneNoisy: true });
+    assert.equal(plan.toRemove.length, 1);
+    assert.equal(plan.toRemove[0].name, 'project_test_base_directory_for_this_skill.md');
+    assert.deepEqual(plan.toRemove[0].reasons, ['noisy-snapshot']);
+
+    const result = applyPrune(plan);
+    assert.equal(result.removedFiles, 1);
+    assert.equal(result.indexRemoved, 1);
+
+    const idx = fs.readFileSync(path.join(memoryDir, 'MEMORY.md'), 'utf8');
+    assert.doesNotMatch(idx, /project_test_base_directory_for_this_skill/);
+    assert.match(idx, /project_real_feature/);
+    assert.match(idx, /user note/);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('isNoisySnapshotFile spares a meta-snapshot that quotes noise but has real signal', () => {
+  // A snapshot ABOUT the noise-filtering work: description quotes the trigger
+  // string, but the body documents real modified files + decisions. Must NOT prune.
+  const { base, memoryDir } = setupFixture([
+    ['project_meta_filter_work.md', 20_000],
+  ]);
+  const p = path.join(memoryDir, 'project_meta_filter_work.md');
+  fs.writeFileSync(p, [
+    '---',
+    'name: ctx snapshot - filter injected intent',
+    'description: work on filtering "Base directory for this skill" from intent',
+    '---',
+    '',
+    '**Last task:** "filter Base directory for this skill from snapshot intent"',
+    '',
+    '**Modified files (3):**',
+    '- src/analyzer.js (/repo/src/analyzer.js)',
+    '- src/prune.js (/repo/src/prune.js)',
+    '- src/test/prune.test.js (/repo/src/test/prune.test.js)',
+    '',
+    '**Decisions made:**',
+    '- skip injected user text when deriving snapshot intent',
+  ].join('\n'));
+
+  try {
+    assert.equal(isNoisySnapshotFile({ name: path.basename(p), path: p }), false);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('isNoisySnapshotFile still prunes pure junk by filename slug', () => {
+  const { base, memoryDir } = setupFixture([
+    ['project_test_base_directory_for_this_skill.md', 20_000],
+  ]);
+  const p = path.join(memoryDir, 'project_test_base_directory_for_this_skill.md');
+  // pure junk: even with a stray path mention, the filename identity is noise
+  fs.writeFileSync(p, '**Last task:** "Base directory for this skill: /tmp/x"\n');
+  try {
+    assert.equal(isNoisySnapshotFile({ name: path.basename(p), path: p }), true);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

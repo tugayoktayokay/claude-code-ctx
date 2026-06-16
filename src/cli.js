@@ -57,8 +57,13 @@ Analysis + memory:
   ctx daemon start|stop|status|log   Background watcher + git commit notifications
   ctx compact                        Build tailored /compact prompt, copy to clipboard
   ctx snapshot [--name NAME]         Write session summary into your memory dir
+  ctx remember [--kind K] "<text>"   Store a granular memory fact (decision|constraint|workflow|bug|note)
+  ctx recall "<query>"               Recall matching facts (ranked by relevance + quality)
+  ctx forget "<text>" [--exact|--id ID] [--yes]
+                                     Remove facts; dry-run unless --yes
+  ctx facts [list|audit|prune]       Inspect / clean the fact store (prune --quality-below S --yes)
   ctx history [N]                    Last N sessions (default 10)
-  ctx prune [--apply] [--older-than 30d] [--keep-last 20] [--per-project]
+  ctx prune [--apply] [--older-than 30d] [--keep-last 20] [--noise-only] [--per-project]
                                      Clean memory dir; dry-run by default
   ctx bloat                          CLAUDE.md + SKILL.md footprint audit
   ctx usage [--tools|--skills] [--days 30]
@@ -724,6 +729,109 @@ function runMetrics(_args, _config) {
   }
 }
 
+function runRemember(args, config) {
+  stripColor();
+  const facts = require('./facts.js');
+  let kind = 'note';
+  const words = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--kind' && args[i + 1]) { kind = args[i + 1]; i++; }
+    else words.push(args[i]);
+  }
+  const text = words.join(' ').trim();
+  if (!text) {
+    console.error('usage: ctx remember [--kind decision|constraint|workflow|bug|note] "<fact text>"');
+    return 1;
+  }
+  const res = facts.rememberFact(process.cwd(), text, config, { kind });
+  if (!res.ok) { console.error(`❌ ${res.reason}`); return 1; }
+  console.log(`✓ remembered [${kind}] ${res.fact.text}`);
+  console.log(`  id ${res.fact.id} · quality ${res.fact.quality.toFixed(2)} · ${res.total} facts total`);
+  return 0;
+}
+
+function runForget(args, config) {
+  stripColor();
+  const facts = require('./facts.js');
+  const opts = {};
+  const words = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--id' && args[i + 1]) { opts.id = args[i + 1]; i++; }
+    else if (args[i] === '--exact') opts.exact = true;
+    else if (args[i] === '--yes' || args[i] === '-y') opts.yes = true;
+    else words.push(args[i]);
+  }
+  const query = opts.id || words.join(' ').trim();
+  if (!query) {
+    console.error('usage: ctx forget "<text>" [--exact] [--yes]   |   ctx forget --id <id> --yes');
+    return 1;
+  }
+  if (!opts.yes) {
+    const preview = facts.forgetFacts(process.cwd(), query, config, { ...opts, dryRun: true });
+    console.log(`would remove ${preview.removed} fact(s) (mode: ${preview.mode}):`);
+    for (const m of preview.matches) console.log(`  - [${m.kind}] ${m.text}`);
+    console.log('re-run with --yes to apply');
+    return 0;
+  }
+  const res = facts.forgetFacts(process.cwd(), query, config, opts);
+  console.log(`✓ removed ${res.removed} fact(s) · ${res.after} remaining`);
+  return 0;
+}
+
+function runRecall(args, config) {
+  stripColor();
+  const facts = require('./facts.js');
+  const opts = {};
+  const words = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--json') opts.json = true;
+    else if (args[i] === '--limit' && args[i + 1]) { opts.limit = Number(args[i + 1]); i++; }
+    else if (args[i] === '--min' && args[i + 1]) { opts.minScore = Number(args[i + 1]); i++; }
+    else words.push(args[i]);
+  }
+  const query = words.join(' ').trim();
+  if (!query) { console.error('usage: ctx recall "<query>" [--limit N] [--min S] [--json]'); return 1; }
+  process.stdout.write(facts.buildRecall(process.cwd(), query, config, opts) + '\n');
+  return 0;
+}
+
+function runFacts(args, config) {
+  stripColor();
+  const facts = require('./facts.js');
+  const sub = args[0];
+  const rest = args.slice(1);
+  const opts = { json: rest.includes('--json') };
+  if (sub === 'audit') {
+    process.stdout.write(facts.auditFacts(process.cwd(), config, opts) + '\n');
+    return 0;
+  }
+  if (sub === 'prune') {
+    opts.dryRun = !rest.includes('--yes');
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--quality-below' && rest[i + 1]) { opts.qualityBelow = Number(rest[i + 1]); i++; }
+    }
+    const res = facts.pruneFacts(process.cwd(), config, opts);
+    if (opts.dryRun) {
+      console.log(`dry-run: would remove ${res.removed} of ${res.before} facts (quality < ${res.quality_below})`);
+      console.log('re-run with --yes to apply');
+    } else {
+      console.log(`✓ pruned ${res.removed} facts · ${res.after} remaining (quality < ${res.quality_below})`);
+    }
+    return 0;
+  }
+  if (sub === 'list' || sub === undefined) {
+    const all = facts.readFacts(process.cwd(), config);
+    if (opts.json) { process.stdout.write(JSON.stringify(all, null, 2) + '\n'); return 0; }
+    if (!all.length) { console.log('no facts stored yet — try `ctx remember ...`'); return 0; }
+    for (const f of all.slice(-Number(opts.limit || 40))) {
+      console.log(`${(f.quality ?? 0).toFixed(2)} [${f.kind}] ${f.text}`);
+    }
+    return 0;
+  }
+  console.error('usage: ctx facts [list|audit|prune] [--json] [--quality-below S] [--yes]');
+  return 1;
+}
+
 function runWorkingSet(_args, config) {
   stripColor();
   const { buildWorkingSet, formatWorkingSet } = require('./working_set.js');
@@ -914,6 +1022,7 @@ function runPrune(args, config) {
   let perProject = false;
   let olderThan = config?.prune?.default_older_than || '30d';
   let keepLast  = config?.prune?.default_keep_last  ?? null;
+  let pruneNoisy = config?.prune?.noisy_snapshots !== false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -922,6 +1031,8 @@ function runPrune(args, config) {
     else if (a === '--older-than' && args[i + 1]) { olderThan = args[i + 1]; i++; }
     else if (a === '--keep-last'  && args[i + 1]) { keepLast  = Number(args[i + 1]); i++; }
     else if (a === '--no-older-than') olderThan = null;
+    else if (a === '--no-noisy') pruneNoisy = false;
+    else if (a === '--noise-only') { olderThan = null; keepLast = null; pruneNoisy = true; }
   }
 
   const memoryDirs = perProject
@@ -934,7 +1045,7 @@ function runPrune(args, config) {
 
   console.log('');
   for (const dir of memoryDirs) {
-    const plan = prune.planFromOpts(dir, { olderThan, keepLast });
+    const plan = prune.planFromOpts(dir, { olderThan, keepLast, pruneNoisy });
     if (!plan.exists) continue;
     totalRemove += plan.toRemove.length;
     totalKeep   += plan.toKeep.length;
@@ -972,13 +1083,15 @@ function runPrune(args, config) {
     console.log('');
   }
 
-  try {
-    const { pruneWorkingMemory } = require('./prune.js');
-    const wmRes = pruneWorkingMemory({ ttl_hours: 24 });
-    if (wmRes.removed) {
-      console.log(`  working_memory: removed ${wmRes.removed} session file(s), freed ${(wmRes.bytes_freed/1024).toFixed(1)} KB`);
-    }
-  } catch {}
+  if (apply) {
+    try {
+      const { pruneWorkingMemory } = require('./prune.js');
+      const wmRes = pruneWorkingMemory({ ttl_hours: 24 });
+      if (wmRes.removed) {
+        console.log(`  working_memory: removed ${wmRes.removed} session file(s), freed ${(wmRes.bytes_freed/1024).toFixed(1)} KB`);
+      }
+    } catch {}
+  }
 
   return 0;
 }
@@ -1023,6 +1136,14 @@ function main(argv) {
       return runHook(rest, config);
     case 'ask':
       return runAsk(rest, config);
+    case 'remember':
+      return runRemember(rest, config);
+    case 'forget':
+      return runForget(rest, config);
+    case 'recall':
+      return runRecall(rest, config);
+    case 'facts':
+      return runFacts(rest, config);
     case 'timeline':
       return runTimeline(rest, config);
     case 'diff':

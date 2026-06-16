@@ -6,6 +6,14 @@ const path = require('path');
 const { CLAUDE_DIR, projectDirFor } = require('./session.js');
 const { rewriteIndex } = require('./snapshot.js');
 
+const NOISY_SNAPSHOT_PATTERNS = [
+  /\bbase_directory_for_this_skill\b/i,
+  /\bbase directory for this skill\b/i,
+  /<system-reminder>/i,
+  /\bcaveman\b.*\bhook\b/i,
+  /CAVEMAN MODE ACTIVE/i,
+];
+
 function parseDuration(str) {
   if (typeof str === 'number') return str;
   if (!str) return null;
@@ -29,6 +37,44 @@ function listProjectMemoryDirs() {
     } catch {}
   }
   return dirs;
+}
+
+function frontmatterField(markdown, field) {
+  const re = new RegExp(`^${field}:\\s*(.*)$`, 'mi');
+  const m = String(markdown || '').match(re);
+  return m ? m[1].trim() : '';
+}
+
+function lastTaskLine(markdown) {
+  const m = String(markdown || '').match(/^\*\*Last task:\*\*\s*"?(.+?)"?\s*$/mi);
+  return m ? m[1].trim() : '';
+}
+
+// A snapshot's body carries real work signal if it lists modified files or
+// real source-file paths. Used to spare a meta-snapshot whose intent merely
+// quotes a noise trigger (e.g. a snapshot about the noise-filtering work itself).
+function hasRealSignal(markdown) {
+  const m = String(markdown || '').match(/\*\*Modified files \((\d+)\)/i);
+  if (m && Number(m[1]) > 0) return true;
+  if (/^[-*]\s+\S+\.(?:js|jsx|ts|tsx|json|md|py|go|rs|css|html|sql|ya?ml)\b/mi.test(markdown)) return true;
+  return false;
+}
+
+function isNoisySnapshotFile(file) {
+  // Identity-level noise: the filename slug itself is injected text → always junk.
+  if (NOISY_SNAPSHOT_PATTERNS.some(re => re.test(file.name))) return true;
+  let markdown = '';
+  try { markdown = fs.readFileSync(file.path, 'utf8'); } catch { return false; }
+
+  const intentFields = [
+    frontmatterField(markdown, 'name'),
+    frontmatterField(markdown, 'description'),
+    lastTaskLine(markdown),
+  ].join('\n');
+
+  if (!NOISY_SNAPSHOT_PATTERNS.some(re => re.test(intentFields))) return false;
+  // Intent quotes noise — but spare it if the body documents real work.
+  return !hasRealSignal(markdown);
 }
 
 function planPrune(memoryDir, opts = {}) {
@@ -58,16 +104,19 @@ function planPrune(memoryDir, opts = {}) {
   const now = Date.now();
   const olderThanMs = opts.olderThanMs ?? null;
   const keepLast    = opts.keepLast ?? null;
+  const pruneNoisy  = opts.pruneNoisy === true;
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     const age = now - f.mtime;
     const tooOld    = olderThanMs != null && age > olderThanMs;
     const overQuota = keepLast != null && i >= keepLast;
-    const remove    = tooOld || overQuota;
+    const noisy     = pruneNoisy && isNoisySnapshotFile(f);
+    const remove    = tooOld || overQuota || noisy;
     const entry     = { ...f, age, reasons: [] };
     if (tooOld)    entry.reasons.push('older-than');
     if (overQuota) entry.reasons.push('over-keep-last');
+    if (noisy)     entry.reasons.push('noisy-snapshot');
     (remove ? plan.toRemove : plan.toKeep).push(entry);
   }
   return plan;
@@ -93,7 +142,8 @@ function applyPrune(plan) {
 function planFromOpts(memoryDir, opts) {
   const olderThanMs = opts.olderThan ? parseDuration(opts.olderThan) : null;
   const keepLast    = opts.keepLast != null ? Number(opts.keepLast) : null;
-  return planPrune(memoryDir, { olderThanMs, keepLast });
+  const pruneNoisy  = opts.pruneNoisy === true;
+  return planPrune(memoryDir, { olderThanMs, keepLast, pruneNoisy });
 }
 
 function pruneWorkingMemory(opts = {}) {
@@ -108,4 +158,5 @@ module.exports = {
   applyPrune,
   planFromOpts,
   pruneWorkingMemory,
+  isNoisySnapshotFile,
 };

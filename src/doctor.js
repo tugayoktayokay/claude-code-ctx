@@ -258,8 +258,11 @@ function driftThresholds(config) {
   return out;
 }
 
-function checkRuntimeDrift() {
+function checkRuntimeDrift(opts = {}) {
   const out = [];
+  // Injectable clock: tests pin `now` so fixed-timestamp fixtures don't rot
+  // out of the rolling window as wall-clock advances past range_days.
+  const now = Number.isFinite(opts.now) ? opts.now : Date.now();
   let config;
   try { config = loadConfig(); } catch { return out; }
   const t = driftThresholds(config);
@@ -272,7 +275,7 @@ function checkRuntimeDrift() {
   let record;
   try {
     const metrics = require('./metrics.js');
-    record = metrics.aggregate(HOOKS_LOG_FILE, { now: Date.now(), rangeDays: t.range_days });
+    record = metrics.aggregate(HOOKS_LOG_FILE, { now, rangeDays: t.range_days });
   } catch (err) {
     out.push({ ...CHECKS.warn, label: 'Runtime drift', detail: `metrics unavailable: ${err.message}` });
     return out;
@@ -289,7 +292,7 @@ function checkRuntimeDrift() {
   if (config?.working_memory?.enabled) {
     const wmDir = process.env.CTX_WORKING_MEMORY_DIR
       || path.join(os.homedir(), '.config', 'ctx', 'working_memory');
-    const store = sumWorkingMemoryStore(wmDir, Date.now() - t.range_days * 86_400_000);
+    const store = sumWorkingMemoryStore(wmDir, now - t.range_days * 86_400_000);
     const recDetail = recordingDriftWarning({
       enabled: true,
       readsRecorded: store.reads,

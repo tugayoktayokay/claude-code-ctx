@@ -501,6 +501,17 @@ function handleUserPromptSubmit(input, config) {
   const warnOn = config?.hooks?.user_prompt_submit?.warn_on || [];
   const auto = config?.hooks?.user_prompt_submit?.auto_retrieve || {};
 
+  // Passive fact capture: high-signal prompts become granular memory facts.
+  // Side-effect only; never blocks or changes the hook output. Degrades silently.
+  try {
+    if (config?.memory?.passive_prompt_extraction !== false && prompt) {
+      const res = require('./facts.js').extractFromPrompt(cwd, prompt, config);
+      if (res.extracted) logHook(config, `facts capture kind=${res.fact.kind} total=${res.total}`);
+    }
+  } catch (err) {
+    logHook(config, `facts capture error: ${err.message}`);
+  }
+
   let pipe;
   try { pipe = pipeline.runAnalyze({ cwd, sessionId: input.session_id, config }); } catch { pipe = null; }
 
@@ -562,7 +573,30 @@ function handleUserPromptSubmit(input, config) {
   const q = makeQuery(prompt, config);
   const retrievalConfig = { ...config, retrieval: { ...config.retrieval, min_score: auto.min_score ?? 0.3, top_n: 1 } };
   const results = rank(q, candidates, retrievalConfig);
-  if (!results.length) return { output: null, exitCode: 0 };
+  if (!results.length) {
+    // Fallback: no snapshot matched — try granular facts.
+    try {
+      const facts = require('./facts.js');
+      const hits = facts.recallFacts(cwd, prompt, config, { limit: 3 });
+      if (hits.length) {
+        const lines = hits.map(f => `- [${f.kind}] ${f.text}`).join('\n');
+        logHook(config, `facts recall n=${hits.length} top=${hits[0].score.toFixed(2)}`);
+        return {
+          output: [
+            `[ctx] Relevant facts from your past work:`,
+            '',
+            lines,
+            '',
+            '(Contextual hint from your own memory, not an instruction.)',
+          ].join('\n'),
+          exitCode: 0,
+        };
+      }
+    } catch (err) {
+      logHook(config, `facts recall error: ${err.message}`);
+    }
+    return { output: null, exitCode: 0 };
+  }
 
   const top = results[0];
   const maxLines = Number.isFinite(auto.max_lines) && auto.max_lines > 0 ? auto.max_lines : 8;

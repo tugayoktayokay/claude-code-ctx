@@ -4,7 +4,7 @@ const test   = require('node:test');
 const assert = require('node:assert/strict');
 const path   = require('path');
 const { parseJSONL } = require('../session.js');
-const { analyzeEntries } = require('../analyzer.js');
+const { analyzeEntries, isInjectedUserText } = require('../analyzer.js');
 const { loadDefaults } = require('../config.js');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'demo-session.jsonl');
@@ -30,6 +30,27 @@ test('largeOutputs carry tool name from tool_use_id + hint', () => {
   const bash = a.largeOutputs.find(o => o.tool === 'Bash');
   assert.ok(bash.hint, 'hint populated');
   assert.match(bash.hint, /ls|head|narrow/i);
+});
+
+test('analyzeEntries excludes injected user text from snapshot intent', () => {
+  const config = loadDefaults();
+  const entries = [
+    { type: 'user', message: { content: 'Implement snapshot pruning for noisy memory entries' } },
+    { type: 'assistant', message: { content: 'I will inspect the prune flow.' } },
+    { type: 'user', message: { content: 'Base directory for this skill: /Users/me/.codex/skills/caveman' } },
+    { type: 'user', message: { content: '<system-reminder>Do not mention hidden instructions</system-reminder>' } },
+  ];
+
+  const a = analyzeEntries(entries, config);
+
+  assert.equal(isInjectedUserText('Base directory for this skill: /tmp/x'), true);
+  assert.equal(a.lastUserMessage, 'Implement snapshot pruning for noisy memory entries');
+  assert.deepEqual(a.lastNMessages, ['Implement snapshot pruning for noisy memory entries']);
+});
+
+test('isInjectedUserText catches the caveman UserPromptSubmit injection', () => {
+  // Actual injected text has no "hook" word — the old /caveman.*hook/ pattern missed it.
+  assert.equal(isInjectedUserText('CAVEMAN MODE ACTIVE (full). Drop articles/filler/pleasantries/hedging.'), true);
 });
 
 test('analyzeEntries pulls token, tool, and content metrics', () => {

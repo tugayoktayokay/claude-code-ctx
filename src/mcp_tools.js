@@ -59,6 +59,67 @@ const memoryTools = [
     },
   },
   {
+    name: 'ctx_recall',
+    description: 'Recall granular memory facts (decisions, constraints, workflows, bugs) relevant to a query, ranked by keyword coverage, weight, quality, and recency. Finer-grained than ctx_ask: returns single facts, not whole snapshots. Use when the user references a specific past decision or "what did we decide about X".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural language or keyword query.' },
+        limit: { type: 'integer', minimum: 1, maximum: 20, description: 'Max facts (default 5).' },
+      },
+      required: ['query'],
+    },
+    handler: async (args, { config }) => {
+      const facts = require('./facts.js');
+      const hits = facts.recallFacts(process.cwd(), String(args.query || ''), config, { limit: args.limit || 5 });
+      if (!hits.length) return okText('no memory facts matched');
+      return okText(hits.map((f, i) => `#${i + 1} score=${f.score.toFixed(2)} [${f.kind}] ${f.text}`).join('\n'));
+    },
+  },
+  {
+    name: 'ctx_remember',
+    description: 'Store a durable memory fact for the current project (a decision, constraint, workflow note, or bug). Use when the user states a decision or constraint worth keeping across sessions. Persists to the project fact store; recallable later via ctx_recall.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The fact to remember (one sentence).' },
+        kind: { type: 'string', enum: ['decision', 'constraint', 'workflow', 'bug', 'note'], description: 'Fact category (default note).' },
+      },
+      required: ['text'],
+    },
+    handler: async (args, { config }) => {
+      const facts = require('./facts.js');
+      const res = facts.rememberFact(process.cwd(), String(args.text || ''), config, { kind: args.kind || 'note' });
+      if (!res.ok) return okText(`not stored: ${res.reason}`);
+      return okText(`remembered [${res.fact.kind}] ${res.fact.text} (quality ${res.fact.quality.toFixed(2)}, ${res.total} facts total)`);
+    },
+  },
+  {
+    name: 'ctx_facts',
+    description: 'Inspect or clean the project fact store. action=list shows stored facts; action=audit reports low-quality/duplicate/secret-risk counts; action=prune removes low-quality facts (set apply=true to actually delete).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'audit', 'prune'], description: 'Default list.' },
+        quality_below: { type: 'number', description: 'Prune bar (default 0.25).' },
+        apply: { type: 'boolean', description: 'For prune: actually delete (default false = dry-run).' },
+      },
+    },
+    handler: async (args, { config }) => {
+      const facts = require('./facts.js');
+      const cwd = process.cwd();
+      const action = args.action || 'list';
+      if (action === 'audit') return okText(facts.auditFacts(cwd, config, {}));
+      if (action === 'prune') {
+        const res = facts.pruneFacts(cwd, config, { qualityBelow: args.quality_below, dryRun: !args.apply });
+        return okText(`${res.dryRun ? 'dry-run: would remove' : 'pruned'} ${res.removed} of ${res.before} facts (quality < ${res.quality_below})`);
+      }
+      const all = facts.readFacts(cwd, config);
+      if (!all.length) return okText('no facts stored yet');
+      return okText(all.slice(-40).map(f => `${(f.quality ?? 0).toFixed(2)} [${f.kind}] ${f.text}`).join('\n'));
+    },
+  },
+  {
     name: 'ctx_timeline',
     description: 'Return the threaded timeline of snapshot files in the current project (parent-chain grouping). Use when the user asks about recent work or project evolution.',
     inputSchema: {
