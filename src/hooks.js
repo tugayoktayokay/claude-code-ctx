@@ -46,12 +46,27 @@ function handleSessionStart(input, config) {
     return { output: null, exitCode: 0 };
   }
 
+  // Durable facts digest — put the captured fact memory into the always-loaded
+  // SessionStart path (otherwise facts are only seen via explicit recall).
+  let digest = '';
+  if (config?.hooks?.session_start?.inject_facts !== false) {
+    try { digest = require('./facts.js').sessionDigest(cwd, config); } catch (err) { logHook(config, `session-start facts error: ${err.message}`); }
+  }
+
   const latest = getLatestSnapshotForCwd(cwd, config);
-  if (!latest) return { output: null, exitCode: 0 };
+  if (!latest) {
+    // No snapshot yet, but facts may still exist — inject them alone.
+    if (!digest) return { output: null, exitCode: 0 };
+    logHook(config, `session-start facts-only digest (${digest.length} bytes)`);
+    return {
+      output: { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: digest } },
+      exitCode: 0,
+    };
+  }
 
   const maxBytes = config.hooks.session_start.max_bytes ?? 8192;
   let content;
-  try { content = fs.readFileSync(latest.path, 'utf8'); } catch { return { output: null, exitCode: 0 }; }
+  try { content = fs.readFileSync(latest.path, 'utf8'); } catch { content = ''; }
 
   let trimmed = content;
   if (trimmed.length > maxBytes) {
@@ -59,14 +74,15 @@ function handleSessionStart(input, config) {
   }
 
   const header = `[ctx] Restoring most recent snapshot from prior session (${path.basename(latest.path)}):\n\n`;
+  const factsBlock = digest ? `\n\n${digest}` : '';
 
-  logHook(config, `session-start restored ${path.basename(latest.path)} (${trimmed.length} bytes)`);
+  logHook(config, `session-start restored ${path.basename(latest.path)} (${trimmed.length} bytes)${digest ? ` + facts (${digest.length}B)` : ''}`);
 
   return {
     output: {
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
-        additionalContext: header + trimmed,
+        additionalContext: header + trimmed + factsBlock,
       },
     },
     exitCode: 0,

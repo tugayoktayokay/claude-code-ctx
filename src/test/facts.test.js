@@ -129,6 +129,31 @@ test('extractFromPrompt disabled by config flag', () => {
   assert.equal(facts.readFacts(CWD, cfg).length, 0);
 });
 
+test('redactSecrets masks api keys, tokens, and key=value secrets', () => {
+  assert.match(facts.redactSecrets('use sk-ABCDEFGHIJKLMNOPQRSTUVWX for openai'), /\[redacted\]/);
+  assert.doesNotMatch(facts.redactSecrets('use sk-ABCDEFGHIJKLMNOPQRSTUVWX'), /sk-ABCDEF/);
+  const kv = facts.redactSecrets('set password: hunter2supersecret');
+  assert.match(kv, /password/);          // key name kept
+  assert.doesNotMatch(kv, /hunter2supersecret/);
+});
+
+test('rememberFact redacts secrets before persisting', () => {
+  const cfg = tmpConfig();
+  facts.rememberFact(CWD, 'deploy uses api_key=AKIAABCDEFGHIJKLMNOP in prod', cfg, { kind: 'decision' });
+  const stored = facts.readFacts(CWD, cfg);
+  assert.equal(stored.length, 1);
+  assert.doesNotMatch(stored[0].text, /AKIAABCDEFGHIJKLMNOP/);
+  assert.match(stored[0].text, /\[redacted\]/);
+});
+
+test('extractFromPrompt redacts secrets', () => {
+  const cfg = tmpConfig();
+  facts.extractFromPrompt(CWD, 'decided to use token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 for ci', cfg);
+  const stored = facts.readFacts(CWD, cfg);
+  assert.ok(stored.length >= 1);
+  assert.ok(stored.every(f => !/ghp_ABCDEF/.test(f.text)));
+});
+
 test('harvestSnapshots lifts decision + failed bullets from snapshot bodies into facts', () => {
   const memDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-harvest-'));
   const cfg = { facts_dir: path.join(memDir, 'facts') };
@@ -195,6 +220,23 @@ test('harvestSnapshots skips noise bullets and is idempotent', () => {
   const countAfterSecond = facts.readFacts(CWD, cfg).length;
   assert.equal(countAfterFirst, countAfterSecond, 'harvest must be idempotent');
   assert.ok(!facts.readFacts(CWD, cfg).some(f => /Base directory for this skill/.test(f.text)));
+});
+
+test('sessionDigest surfaces top durable facts, excludes plain notes', () => {
+  const cfg = tmpConfig();
+  facts.rememberFact(CWD, 'use Postgres for analytics, not SQLite', cfg, { kind: 'decision' });
+  facts.rememberFact(CWD, 'never block the Stop hook — always exit 0', cfg, { kind: 'constraint' });
+  facts.rememberFact(CWD, 'looked at the readme briefly', cfg, { kind: 'note' });
+  const digest = facts.sessionDigest(CWD, cfg, {});
+  assert.match(digest, /Postgres for analytics/);
+  assert.match(digest, /always exit 0/);
+  assert.doesNotMatch(digest, /looked at the readme/);
+});
+
+test('sessionDigest returns empty string when no durable facts', () => {
+  const cfg = tmpConfig();
+  facts.rememberFact(CWD, 'just a passing note', cfg, { kind: 'note' });
+  assert.equal(facts.sessionDigest(CWD, cfg, {}), '');
 });
 
 test('auditFacts reports low_quality count', () => {

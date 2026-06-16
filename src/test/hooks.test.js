@@ -99,6 +99,62 @@ test('session-start: truncates to max_bytes', () => {
   fs.rmSync(base, { recursive: true, force: true });
 });
 
+test('session-start: appends durable facts digest to snapshot restore', () => {
+  const base = tmpMemoryDir();
+  const memoryDir = path.join(base, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(memoryDir, 'project_recent.md'),
+    '---\nname: recent\nfingerprint: abcabcabcabcabca\n---\nBody content here'
+  );
+
+  const cfg = configWithDirs({ memoryDir });
+  cfg.hooks.session_start.restore_latest = true;
+  const facts = require('../facts.js');
+  facts.rememberFact('/tmp/x', 'use Postgres for analytics, not SQLite', cfg, { kind: 'decision' });
+
+  const res = handleSessionStart({ cwd: '/tmp/x', source: 'startup' }, cfg);
+  assert.match(res.output.hookSpecificOutput.additionalContext, /Body content here/);
+  assert.match(res.output.hookSpecificOutput.additionalContext, /Durable facts/);
+  assert.match(res.output.hookSpecificOutput.additionalContext, /Postgres for analytics/);
+
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
+test('session-start: injects facts even with no snapshot present', () => {
+  const base = tmpMemoryDir();
+  const memoryDir = path.join(base, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+
+  const cfg = configWithDirs({ memoryDir });
+  cfg.hooks.session_start.restore_latest = true;
+  const facts = require('../facts.js');
+  facts.rememberFact('/tmp/y', 'never block the Stop hook — always exit 0', cfg, { kind: 'constraint' });
+
+  const res = handleSessionStart({ cwd: '/tmp/y', source: 'startup' }, cfg);
+  assert.ok(res.output, 'expected facts-only digest output');
+  assert.match(res.output.hookSpecificOutput.additionalContext, /always exit 0/);
+
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
+test('session-start: inject_facts=false suppresses the digest', () => {
+  const base = tmpMemoryDir();
+  const memoryDir = path.join(base, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+
+  const cfg = configWithDirs({ memoryDir });
+  cfg.hooks.session_start.restore_latest = true;
+  cfg.hooks.session_start.inject_facts = false;
+  const facts = require('../facts.js');
+  facts.rememberFact('/tmp/z', 'use Redis for the cache layer', cfg, { kind: 'decision' });
+
+  const res = handleSessionStart({ cwd: '/tmp/z', source: 'startup' }, cfg);
+  assert.equal(res.output, null);
+
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
 test('stop: respects stop_hook_active loop guard', async () => {
   const cfg = configWithDirs();
   const res = await handleStop({ cwd: '/tmp', stop_hook_active: true }, cfg);

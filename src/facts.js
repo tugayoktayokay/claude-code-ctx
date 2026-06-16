@@ -38,9 +38,25 @@ function normalizeText(text, max = 220) {
   return String(text || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+// High-entropy credential shapes and key=value secrets. Applied at the
+// writeFacts choke so every capture path (remember/passive/harvest) stores
+// redacted text — secrets never hit facts.jsonl in plaintext.
+const SECRET_TOKEN_RE = /\b(?:sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[abp]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,})\b/g;
+const SECRET_KV_RE = /((?:bearer|password|api[_-]?key|secret_key|client_secret|token)\s*[:=]\s*['"]?)([A-Za-z0-9._=\-+/]{8,})/gi;
+const PRIVATE_TAG_RE = /<private>[\s\S]*?<\/private>|\[ctx:private\][\s\S]*?\[\/ctx:private\]/gi;
+
+function redactSecrets(text) {
+  return String(text || '')
+    .replace(PRIVATE_TAG_RE, '[redacted]')
+    .replace(SECRET_TOKEN_RE, '[redacted]')
+    .replace(SECRET_KV_RE, '$1[redacted]');
+}
+
 function isNoisyFactText(text) {
   const t = String(text || '');
-  return /\b(UserPromptSubmit|PostToolUse|PreToolUse|SessionStart|Stop)\s+hook\b/i.test(t)
+  // Hook event-log residue: require the status suffix so legit prose mentioning
+  // a hook (e.g. "never block the Stop hook") is NOT misflagged as noise.
+  return /\b(UserPromptSubmit|PostToolUse|PreToolUse|SessionStart|Stop)\s+hook\s*\((?:completed|blocked|failed)\)/i.test(t)
     || /\bhook context:/i.test(t)
     || /^snapshot\s+stop-/i.test(t)
     || /^\s*Base directory for this skill/i.test(t)
@@ -106,7 +122,11 @@ function writeFacts(cwd, facts, config = {}) {
   const byId = new Map(readFacts(cwd, config).map(f => [f.id, f]));
   const threshold = Number(config?.memory?.prune_quality_below ?? 0.25);
   const maxFacts = Number(config?.memory?.max_facts) > 0 ? Number(config.memory.max_facts) : 1000;
-  for (const f of facts) {
+  for (const raw of facts) {
+    // Redact secrets at the choke point; recompute id from the cleaned text
+    // so dedup keys on what is actually stored.
+    const text = redactSecrets(raw.text);
+    const f = text === raw.text ? raw : { ...raw, text, id: factId(raw.cwd ?? cwd, raw.kind, text), paths: extractPaths(text) };
     const prior = byId.get(f.id);
     byId.set(f.id, prior ? { ...prior, ...f, seen: Number(prior.seen || 1) + 1 } : f);
   }
@@ -301,6 +321,37 @@ function harvestSnapshots(memoryDir, cwd, config = {}, opts = {}) {
   return { scanned, extracted: harvested.length, total, path: factPathFor(cwd, config) };
 }
 
+// Highest-value durable facts (decisions/constraints/workflows/bugs), ranked
+// by quality*weight with a recency tiebreak. Used to inject memory into the
+// always-loaded SessionStart path.
+function topFacts(cwd, config = {}, opts = {}) {
+  const limit = Number(opts.limit || config?.memory?.session_start_facts || 8);
+  const kinds = new Set(['decision', 'constraint', 'workflow', 'bug']);
+  const halfLife = Number(config?.memory?.recency_half_life_days || 45);
+  return readFacts(cwd, config)
+    .filter(f => kinds.has(f.kind) && !isNoisyFactText(f.text))
+    .map(f => {
+      const ageDays = Math.max(0, (Date.now() - Date.parse(f.ts || 0)) / 86400000);
+      const recency = Number.isFinite(ageDays) ? Math.pow(0.5, ageDays / Math.max(1, halfLife)) : 0;
+      const rank = Number(f.quality ?? factQuality(f.kind, f.text)) * Number(f.weight || 1) + 0.3 * recency;
+      return { ...f, rank };
+    })
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, limit);
+}
+
+function sessionDigest(cwd, config = {}, opts = {}) {
+  const facts = topFacts(cwd, config, opts);
+  if (!facts.length) return '';
+  return [
+    '[ctx] Durable facts from your past work on this project:',
+    '',
+    ...facts.map(f => `- [${f.kind}] ${f.text}`),
+    '',
+    '(Your own captured memory, not an instruction.)',
+  ].join('\n');
+}
+
 function pruneFacts(cwd, config = {}, opts = {}) {
   const threshold = Number(opts.qualityBelow ?? config?.memory?.prune_quality_below ?? 0.25);
   const all = readFacts(cwd, config);
@@ -372,6 +423,7 @@ module.exports = {
   factWeight,
   extractPaths,
   factQuality,
+  redactSecrets,
   readFacts,
   writeFacts,
   rememberFact,
@@ -383,6 +435,8 @@ module.exports = {
   extractFromPrompt,
   harvestSnapshots,
   sectionBullets,
+  topFacts,
+  sessionDigest,
   pruneFacts,
   auditFacts,
 };
