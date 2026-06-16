@@ -1,0 +1,76 @@
+src/prune.js
+  s_dc4af255a437e0::t_616db3c413e369 14
+  s_dc4af255a437e0::t_6ff9b2f972a33d 53-62,64,75-77
+  s_d6f128755d0ae5::t_0492f296514c4a 9-13,15-16,42-52,63,65-74,107,114-115,119,145-146,161
+commands/ctx-prune.md
+  s_d6f128755d0ae5::t_ce6e8e4687e578 3
+README.md
+  s_d6f128755d0ae5::t_bdbb4776adeab9 168
+src/facts.js
+  s_dc4af255a437e0::t_1e4a90d5a79c56 1-216,247-325,327-329
+  s_dc4af255a437e0::t_ea399a1cd87ac3 217-246
+  s_dc4af255a437e0::t_565ef8c2d2ebb8 326
+src/test/facts.test.js
+  s_dc4af255a437e0::t_46bc1602c209e8 91,93,95,97,99,102-105
+  s_dc4af255a437e0::t_b9328ebb95698a 108-131
+  s_dc4af255a437e0::t_032cc70a18a384 1-90,92,94,96,98,100-101,106-107,132-143
+src/mcp_tools.js
+  s_dc4af255a437e0::t_c8bcafc32953cc 62-121
+package.json
+  s_dc4af255a437e0::t_4b7ded598542a0 3
+src/cli.js
+  s_d6f128755d0ae5::t_06de78870567e9 1025,1034-1035,1048
+  s_d6f128755d0ae5::t_6ea5c118750222 1086-1094
+  s_dc4af255a437e0::t_75fd357849d0e0 732-834
+  s_dc4af255a437e0::t_82099aa77d0390 60-64
+  s_dc4af255a437e0::t_ca22aa19b53b45 1139-1146
+  s_d6f128755d0ae5::t_70fe77bfa290f9 66
+src/analyzer.js
+  s_dc4af255a437e0::t_e3c913c7995d0d 23
+  s_d6f128755d0ae5::t_390b0c2cb2f1e6 17-22,24-31,119-121,258
+config.default.json
+  s_dc4af255a437e0::t_65f86afb71624c 127-136
+  s_d6f128755d0ae5::t_9ebabaf0feaf52 116-117
+src/doctor.js
+  s_dc4af255a437e0::t_37229550660fc3 295
+  s_dc4af255a437e0::t_13b02416124c2d 261,263-265
+  s_dc4af255a437e0::t_fd6024143fa48f 278
+src/hooks.js
+  s_dc4af255a437e0::t_8673ff49e2419a 576-599
+  s_dc4af255a437e0::t_c554c8edc9e88c 504-514
+src/test/doctor.test.js
+  s_dc4af255a437e0::t_8f58513d4dcb59 168
+  s_dc4af255a437e0::t_edf9af9d6e1ced 100
+.claude-plugin/plugin.json
+  s_dc4af255a437e0::t_4b7ded598542a0 3
+src/test/analyzer.test.js
+  s_dc4af255a437e0::t_538707ef7d7f67 51-55
+  s_d6f128755d0ae5::t_ec656cd2b0ba29 7,35-48
+src/test/prune.test.js
+  s_dc4af255a437e0::t_19c70ecd42f19d 134-178
+  s_d6f128755d0ae5::t_c2638e29401beb 9,99-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "1dd8410e60cbe9f8b837f135cfb8825b910202d4",
+  "prompts": {},
+  "sessions": {
+    "s_d6f128755d0ae5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecf47-5716-7ad0-9fb0-f848699a891d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    },
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
