@@ -29,6 +29,30 @@ function isInjectedUserText(text) {
   return INJECTED_USER_PATTERNS.some(re => re.test(t));
 }
 
+// Pull the specific sentence(s) matching `re` out of assistant prose, instead
+// of grabbing the message opener. Splits on sentence/line/bullet boundaries,
+// strips markdown markers, drops headers and too-short/long fragments.
+function extractStatements(text, re, opts = {}) {
+  const max = opts.max || 3;
+  const fragments = String(text || '')
+    .split(/\n+|(?<=[.!?])\s+/)
+    .map(s => s.replace(/^\s*[-*•>]\s+/, '').replace(/^#+\s*/, '').replace(/\s+/g, ' ').trim());
+  const out = [];
+  const seen = new Set();
+  for (const f of fragments) {
+    if (f.length < 15 || f.length > 200) continue;
+    if (/^[#>]/.test(f)) continue;               // leftover header/quote marker
+    if (/^[*_`#~\->\s]*$/.test(f)) continue;      // pure markup
+    if (!re.test(f)) continue;
+    const key = f.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f.slice(0, 160));
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 function categorize(text, categories, map) {
   const lower = text.toLowerCase();
   for (const [key, cat] of Object.entries(categories)) {
@@ -138,11 +162,13 @@ function analyzeEntries(entries, config) {
       if (text.length > 20) {
         categorize(text, categories, analysis.activeCategories);
         extractCritical(text, analysis.criticalBits);
-        if (/(?:karar|decided|seçtik|kullanacağız|yapacağız)/i.test(text)) {
-          analysis.decisions.push(text.slice(0, 150));
+        const DECISION_RE = /(?:karar|decided|seçtik|kullanacağız|yapacağız|kullanalım|yapalım|tercih ett)/i;
+        const FAILED_RE = /(?:olmadı|çalışmadı|başarısız|denedik ama|bu yaklaşım|failed|doesn['’]?t work)/i;
+        if (DECISION_RE.test(text)) {
+          analysis.decisions.push(...extractStatements(text, DECISION_RE));
         }
-        if (/(?:olmadı|çalışmadı|başarısız|denedik ama|bu yaklaşım)/i.test(text)) {
-          analysis.failedAttempts.push(text.slice(0, 100));
+        if (FAILED_RE.test(text)) {
+          analysis.failedAttempts.push(...extractStatements(text, FAILED_RE));
         }
       }
       if (analysis.tokenHistory.length > 0) {
@@ -256,4 +282,5 @@ module.exports = {
   analyzeEntries,
   CRITICAL_PATTERNS,
   isInjectedUserText,
+  extractStatements,
 };

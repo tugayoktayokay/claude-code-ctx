@@ -4,7 +4,7 @@ const test   = require('node:test');
 const assert = require('node:assert/strict');
 const path   = require('path');
 const { parseJSONL } = require('../session.js');
-const { analyzeEntries, isInjectedUserText } = require('../analyzer.js');
+const { analyzeEntries, isInjectedUserText, extractStatements } = require('../analyzer.js');
 const { loadDefaults } = require('../config.js');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'demo-session.jsonl');
@@ -51,6 +51,32 @@ test('analyzeEntries excludes injected user text from snapshot intent', () => {
 test('isInjectedUserText catches the caveman UserPromptSubmit injection', () => {
   // Actual injected text has no "hook" word — the old /caveman.*hook/ pattern missed it.
   assert.equal(isInjectedUserText('CAVEMAN MODE ACTIVE (full). Drop articles/filler/pleasantries/hedging.'), true);
+});
+
+test('extractStatements returns the matching sentence, not the message opener', () => {
+  const re = /(?:karar|decided|seçtik|kullanacağız|yapacağız)/i;
+  const text = 'Kısa cevap: evet. Postgres kullanacağız çünkü OLAP sorguları ağır. Ayrıca cache ekleyeceğiz.';
+  const out = extractStatements(text, re);
+  assert.ok(out.some(s => /^Postgres kullanacağız çünkü OLAP/.test(s)), `got: ${JSON.stringify(out)}`);
+  assert.ok(!out.some(s => /Kısa cevap/.test(s)));
+});
+
+test('extractStatements drops headers and too-short fragments', () => {
+  const re = /(?:karar|decided)/i;
+  const text = '## Karar başlığı\nbunu decided ettik: tek bir merkezi config kullan.';
+  const out = extractStatements(text, re);
+  assert.ok(!out.some(s => /^#/.test(s)));
+  assert.ok(out.some(s => /tek bir merkezi config/.test(s)));
+});
+
+test('analyzeEntries captures the decision sentence from assistant prose', () => {
+  const config = loadDefaults();
+  const entries = [
+    { type: 'assistant', message: { content: 'Dürüst cevap: karmaşık. Sonuçta Redis kullanacağız çünkü düşük gecikme şart.' } },
+  ];
+  const a = analyzeEntries(entries, config);
+  assert.ok(a.decisions.some(d => /Redis kullanacağız çünkü/.test(d)), `got: ${JSON.stringify(a.decisions)}`);
+  assert.ok(!a.decisions.some(d => /Dürüst cevap/.test(d)));
 });
 
 test('analyzeEntries pulls token, tool, and content metrics', () => {
