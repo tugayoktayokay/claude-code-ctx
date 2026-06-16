@@ -1,0 +1,27 @@
+src/test/facts.test.js
+  s_dc4af255a437e0::t_cb0ec157fb7d5a 149-156
+.claude-plugin/plugin.json
+  s_dc4af255a437e0::t_d95230cc967e60 3
+package.json
+  s_dc4af255a437e0::t_d95230cc967e60 3
+src/facts.js
+  s_dc4af255a437e0::t_b7b4315733e619 143
+  s_dc4af255a437e0::t_ea59d9ea5f1556 300
+  s_dc4af255a437e0::t_82fa078613a50e 246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "a7bedda67b7d63834a28ed3a3fe779722480dec1",
+  "prompts": {},
+  "sessions": {
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
