@@ -146,6 +146,14 @@ test('rememberFact redacts secrets before persisting', () => {
   assert.match(stored[0].text, /\[redacted\]/);
 });
 
+test('rememberFact returns redacted text (no secret echo in the result)', () => {
+  const cfg = tmpConfig();
+  const res = facts.rememberFact(CWD, 'deploy uses api_key=AKIAZZZZTESTKEY12345 in prod', cfg, { kind: 'constraint' });
+  assert.ok(res.ok);
+  assert.doesNotMatch(res.fact.text, /AKIAZZZZTESTKEY12345/);
+  assert.match(res.fact.text, /\[redacted\]/);
+});
+
 test('extractFromPrompt redacts secrets', () => {
   const cfg = tmpConfig();
   facts.extractFromPrompt(CWD, 'decided to use token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 for ci', cfg);

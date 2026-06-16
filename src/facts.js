@@ -140,7 +140,7 @@ function writeFacts(cwd, facts, config = {}) {
 
 function rememberFact(cwd, text, config = {}, opts = {}) {
   const kind = opts.kind || 'note';
-  const clean = normalizeText(text, 500);
+  const clean = redactSecrets(normalizeText(text, 500));
   if (!clean) return { ok: false, reason: 'empty fact' };
   const fact = {
     id: factId(cwd, kind, clean),
@@ -243,7 +243,7 @@ const STRONG_RE = /\b(karar|decision|decided|prefer|avoid|must|should|kullan|use
 // config.memory.passive_prompt_extraction (default on).
 function extractFromPrompt(cwd, prompt, config = {}, opts = {}) {
   if (config?.memory?.passive_prompt_extraction === false) return { extracted: 0 };
-  const clean = normalizeText(prompt, 260);
+  const clean = redactSecrets(normalizeText(prompt, 260));
   if (!clean || clean.length < 12) return { extracted: 0 };
   if (isNoisyFactText(clean) || isGenericQuery(clean, config)) return { extracted: 0 };
   if (!SIGNAL_RE.test(clean)) return { extracted: 0 };
@@ -297,7 +297,7 @@ function harvestSnapshots(memoryDir, cwd, config = {}, opts = {}) {
     scanned++;
     const ts = opts.ts || new Date().toISOString();
     const add = (kind, raw) => {
-      const text = normalizeText(raw, 240);
+      const text = redactSecrets(normalizeText(raw, 240));
       if (!text || text.length < 12 || isNoisyFactText(text)) return;
       // Snapshot bullets are often assistant prose, not atomic decisions:
       // drop markdown headers and overlapping decision/failed dumps.
