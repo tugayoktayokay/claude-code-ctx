@@ -1,0 +1,31 @@
+src/test/facts.test.js
+  s_dc4af255a437e0::t_763837dff0b8f4 133-134
+  s_dc4af255a437e0::t_004d0d801a480b 132,135-161,183,186-199
+  s_dc4af255a437e0::t_797eb13cd99b0d 184-185
+  s_dc4af255a437e0::t_75c005e40a5837 162-182
+src/cli.js
+  s_dc4af255a437e0::t_1245d84b7cd1ec 64-65
+  s_dc4af255a437e0::t_6bb8fbbbe0873e 823-828,838
+src/facts.js
+  s_dc4af255a437e0::t_0474a5a7a3fb0e 247-270,272-281,288-295,297-303
+  s_dc4af255a437e0::t_15fb630e8886e4 384-385
+  s_dc4af255a437e0::t_6e3a2915873efc 271,282-287,296
+src/mcp_tools.js
+  s_dc4af255a437e0::t_dd40389e85c759 103,113-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "fb5e785f8ccc198d197008c9d3363b13f9e0bd48",
+  "prompts": {},
+  "sessions": {
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
