@@ -234,20 +234,28 @@ function buildRecall(cwd, query, config = {}, opts = {}) {
   return hits.map((f, i) => `#${i + 1} score=${f.score.toFixed(2)} ${f.kind} ${f.ts}\n${f.text}`).join('\n\n');
 }
 
-// Decision/error-signal keywords (EN + TR) that make a prompt worth keeping.
-const SIGNAL_RE = /\b(karar|decision|decided|fix|hata|error|root cause|sorun|deploy|prod|auth|api|database|migration|prefer|avoid|must|should|use\b|kullan|çalışmıyor)\b/i;
-const STRONG_RE = /\b(karar|decision|decided|prefer|avoid|must|should|kullan|use\b)\b/i;
+// Only genuine decision/constraint STATEMENTS become facts. Questions and
+// weak-signal chatter are skipped so passive capture doesn't flood the store
+// (every captured fact also costs tokens via the SessionStart digest).
+const DECISION_VERB_RE = /\b(karar|decided|decision|kullanal[ıi]m|kullanacağ[ıi]z|yapal[ıi]m|yapacağ[ıi]z|tercih ett|prefer|must|should|avoid|never|asla)\b/i;
+const CONSTRAINT_RE = /\b(must|should|avoid|never|prefer|asla)\b/i;
+const INTERROGATIVE_START_RE = /^(which|what|how|why|when|who|where|should|can|could|would|hangi|nas[ıi]l|neden|niye|kim|nerede|nereye)\b/i;
+
+function looksLikeQuestion(text) {
+  const t = String(text || '').trim();
+  return /\?/.test(t) || INTERROGATIVE_START_RE.test(t);
+}
 
 // Passive extraction: turn a high-signal user prompt into a fact.
-// Selective by regex so chit-chat never floods the store. Gated by
-// config.memory.passive_prompt_extraction (default on).
+// Gated by config.memory.passive_prompt_extraction (default on).
 function extractFromPrompt(cwd, prompt, config = {}, opts = {}) {
   if (config?.memory?.passive_prompt_extraction === false) return { extracted: 0 };
   const clean = redactSecrets(normalizeText(prompt, 260));
   if (!clean || clean.length < 12) return { extracted: 0 };
   if (isNoisyFactText(clean) || isGenericQuery(clean, config)) return { extracted: 0 };
-  if (!SIGNAL_RE.test(clean)) return { extracted: 0 };
-  const kind = STRONG_RE.test(clean) ? 'decision' : 'prompt';
+  if (looksLikeQuestion(clean)) return { extracted: 0 };
+  if (!DECISION_VERB_RE.test(clean)) return { extracted: 0 };
+  const kind = CONSTRAINT_RE.test(clean) ? 'constraint' : 'decision';
   const fact = {
     id: factId(cwd, kind, clean),
     cwd,

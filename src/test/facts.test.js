@@ -122,6 +122,27 @@ test('extractFromPrompt ignores chit-chat prompts', () => {
   assert.equal(facts.readFacts(CWD, cfg).length, 0);
 });
 
+test('extractFromPrompt skips questions even with decision keywords', () => {
+  const cfg = tmpConfig();
+  assert.equal(facts.extractFromPrompt(CWD, 'which database should we use for analytics?', cfg).extracted, 0);
+  assert.equal(facts.extractFromPrompt(CWD, 'should we avoid global state here', cfg).extracted, 0);
+  assert.equal(facts.readFacts(CWD, cfg).length, 0);
+});
+
+test('extractFromPrompt skips weak-signal statements (no decision verb)', () => {
+  const cfg = tmpConfig();
+  // has "api"/"error" signal but no decision/constraint verb → not a fact
+  assert.equal(facts.extractFromPrompt(CWD, 'the api returned an error again yesterday', cfg).extracted, 0);
+  assert.equal(facts.readFacts(CWD, cfg).length, 0);
+});
+
+test('extractFromPrompt captures constraint statements as constraint kind', () => {
+  const cfg = tmpConfig();
+  const res = facts.extractFromPrompt(CWD, 'we must never commit secrets to the repo', cfg);
+  assert.equal(res.extracted, 1);
+  assert.equal(facts.readFacts(CWD, cfg)[0].kind, 'constraint');
+});
+
 test('extractFromPrompt disabled by config flag', () => {
   const cfg = { ...tmpConfig(), memory: { passive_prompt_extraction: false } };
   const res = facts.extractFromPrompt(CWD, 'decided to drop the cache layer', cfg);
