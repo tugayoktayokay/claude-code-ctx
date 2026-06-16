@@ -1,0 +1,26 @@
+src/prune.js
+  s_dc4af255a437e0::t_a9132f7a8083ac 154-169,178
+config.default.json
+  s_dc4af255a437e0::t_7b64f66d078345 54-55
+src/hooks.js
+  s_dc4af255a437e0::t_6432c97779c421 129-139
+src/test/prune.test.js
+  s_dc4af255a437e0::t_6a4a0a98567db2 9
+  s_dc4af255a437e0::t_c2aa365d466586 179-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "3e30f9d9838c7f7b2b5c8b3df4075f2583e7e74c",
+  "prompts": {},
+  "sessions": {
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
