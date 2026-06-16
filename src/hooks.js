@@ -126,6 +126,17 @@ async function handleStop(input, config) {
       logHook(config, `stop snapshot level=${pipe.decision.level} dedup=${result.dedupHit} file=${result.filename || '-'}`);
       return result;
     });
+    // Retention cap: trim snapshot overflow right after writing a new one.
+    if (Number(config?.snapshot?.max_keep) > 0) {
+      tasks.push(() => {
+        try {
+          const prune = require('./prune.js');
+          const memoryDir = snapshotMod.resolveMemoryDir(cwd, config);
+          const res = prune.retentionPrune(memoryDir, config);
+          if (res.removed) logHook(config, `stop retention kept=${config.snapshot.max_keep} removed=${res.removed} index=${res.indexRemoved}`);
+        } catch (err) { logHook(config, `stop retention error: ${err.message}`); }
+      });
+    }
   }
 
   if (backupOn.includes(pipe.decision.level) && pipe.session?.path) {

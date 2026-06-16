@@ -6,7 +6,7 @@ const fs     = require('fs');
 const os     = require('os');
 const path   = require('path');
 
-const { parseDuration, planPrune, applyPrune, planFromOpts, isNoisySnapshotFile } = require('../prune.js');
+const { parseDuration, planPrune, applyPrune, planFromOpts, isNoisySnapshotFile, retentionPrune } = require('../prune.js');
 
 function setupFixture(ages) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-prune-'));
@@ -171,6 +171,41 @@ test('isNoisySnapshotFile still prunes pure junk by filename slug', () => {
   fs.writeFileSync(p, '**Last task:** "Base directory for this skill: /tmp/x"\n');
   try {
     assert.equal(isNoisySnapshotFile({ name: path.basename(p), path: p }), true);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('retentionPrune keeps the newest max_keep snapshots and drops the rest', () => {
+  const { base, memoryDir } = setupFixture([
+    ['project_a.md', 5 * 86_400_000],
+    ['project_b.md', 4 * 86_400_000],
+    ['project_c.md', 3 * 86_400_000],
+    ['project_d.md', 2 * 86_400_000],
+    ['project_e.md', 1 * 86_400_000],
+  ]);
+  try {
+    const res = retentionPrune(memoryDir, { snapshot: { max_keep: 3 } });
+    assert.equal(res.removed, 2);
+    const left = fs.readdirSync(memoryDir).filter(n => n.startsWith('project_'));
+    assert.equal(left.length, 3);
+    // newest three survive
+    assert.ok(left.includes('project_c.md') && left.includes('project_d.md') && left.includes('project_e.md'));
+    assert.ok(!left.includes('project_a.md') && !left.includes('project_b.md'));
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('retentionPrune is a no-op when max_keep unset or count under cap', () => {
+  const { base, memoryDir } = setupFixture([
+    ['project_a.md', 2 * 86_400_000],
+    ['project_b.md', 1 * 86_400_000],
+  ]);
+  try {
+    assert.equal(retentionPrune(memoryDir, {}).skipped, true);
+    assert.equal(retentionPrune(memoryDir, { snapshot: { max_keep: 10 } }).removed, 0);
+    assert.equal(fs.readdirSync(memoryDir).filter(n => n.startsWith('project_')).length, 2);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

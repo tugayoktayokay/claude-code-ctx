@@ -151,6 +151,22 @@ function pruneWorkingMemory(opts = {}) {
   return wm.gcOldSessions(opts);
 }
 
+// Retention cap: keep the newest `snapshot.max_keep` snapshots (plus drop any
+// noisy ones), removing the overflow. Called from the Stop hook after a
+// snapshot is written. No-op unless max_keep is a positive number — so the
+// default (unset) never surprise-deletes real snapshots.
+function retentionPrune(memoryDir, config = {}) {
+  const maxKeep = Number(config?.snapshot?.max_keep);
+  if (!(maxKeep > 0)) return { skipped: true, removed: 0 };
+  const plan = planPrune(memoryDir, {
+    keepLast: maxKeep,
+    pruneNoisy: config?.prune?.noisy_snapshots !== false,
+  });
+  if (!plan.toRemove.length) return { skipped: false, removed: 0, kept: plan.toKeep.length };
+  const res = applyPrune(plan);
+  return { skipped: false, removed: res.removedFiles, indexRemoved: res.indexRemoved, kept: plan.toKeep.length };
+}
+
 module.exports = {
   parseDuration,
   listProjectMemoryDirs,
@@ -159,4 +175,5 @@ module.exports = {
   planFromOpts,
   pruneWorkingMemory,
   isNoisySnapshotFile,
+  retentionPrune,
 };
