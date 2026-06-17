@@ -1,0 +1,33 @@
+src/analyzer.js
+  s_dc4af255a437e0::t_9baf940b2b47d9 24-26
+src/hooks.js
+  s_dc4af255a437e0::t_9c6d5b92b26124 279
+src/test/prune.test.js
+  s_dc4af255a437e0::t_7dc91a12db8853 165-182
+package.json
+  s_dc4af255a437e0::t_fad2e5e96639d2 3
+src/test/hooks.test.js
+  s_dc4af255a437e0::t_8bf6cfb38d1b37 365-380
+src/test/analyzer.test.js
+  s_dc4af255a437e0::t_436cbbb62fe6cc 56-66
+src/prune.js
+  s_dc4af255a437e0::t_0846af4ea73c73 15-16
+.claude-plugin/plugin.json
+  s_dc4af255a437e0::t_fad2e5e96639d2 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "314d82e4e0b57614dbbfc95e782bb504fab997c5",
+  "prompts": {},
+  "sessions": {
+    "s_dc4af255a437e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3cfe3fe2-032c-4452-8af4-b2faa9fb2c4f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
