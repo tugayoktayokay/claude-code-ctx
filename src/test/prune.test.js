@@ -162,6 +162,24 @@ test('isNoisySnapshotFile spares a meta-snapshot that quotes noise but has real 
   }
 });
 
+test('isNoisySnapshotFile flags command-echo snapshots (slash/bang intent)', () => {
+  const { base, memoryDir } = setupFixture([['project_test_ctx_version_5.md', 20_000]]);
+  const p = path.join(memoryDir, 'project_test_ctx_version_5.md');
+  fs.writeFileSync(p, [
+    '---',
+    'name: ctx snapshot - test ctx version',
+    'description: Tests — last: "!ctx --version"',
+    '---',
+    '',
+    '**Last task:** "!ctx --version"',
+  ].join('\n'));
+  try {
+    assert.equal(isNoisySnapshotFile({ name: path.basename(p), path: p }), true);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test('isNoisySnapshotFile still prunes pure junk by filename slug', () => {
   const { base, memoryDir } = setupFixture([
     ['project_test_base_directory_for_this_skill.md', 20_000],

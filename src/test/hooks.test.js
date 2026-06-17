@@ -362,6 +362,22 @@ test('pre-tool-use passes through when no rule matches', () => {
   assert.equal(res.output, null);
 });
 
+test('pre-tool wm Read on a directory does not raise EISDIR', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-wm-dir-'));
+  const cfg = configWithDirs();
+  cfg.working_memory = { enabled: true, min_dedup_size_bytes: 1 };
+  const logPath = path.join(FILE_TMP_HOME, '.config', 'ctx', 'hooks.log');
+  try { fs.rmSync(logPath, { force: true }); } catch {}
+
+  const res = handlePreToolUse({ tool_name: 'Read', session_id: 'wmdir', tool_input: { file_path: dir } }, cfg);
+  assert.equal(res.output, null);
+
+  let log = ''; try { log = fs.readFileSync(logPath, 'utf8'); } catch {}
+  assert.ok(!/EISDIR|working_memory error/i.test(log), `unexpected wm error logged: ${log}`);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('pre-tool-use disabled returns null regardless of rules', () => {
   const cfg = configWithDirs();
   cfg.hooks.pre_tool_use = {

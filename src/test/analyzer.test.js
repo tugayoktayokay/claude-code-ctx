@@ -53,6 +53,17 @@ test('isInjectedUserText catches the caveman UserPromptSubmit injection', () => 
   assert.equal(isInjectedUserText('CAVEMAN MODE ACTIVE (full). Drop articles/filler/pleasantries/hedging.'), true);
 });
 
+test('isInjectedUserText catches slash/bang command echoes (snapshot naming noise)', () => {
+  assert.equal(isInjectedUserText('!ctx --version'), true);
+  assert.equal(isInjectedUserText('/plugin update claude-code-ctx'), true);
+  assert.equal(isInjectedUserText(' /reload-plugins'), true);
+  assert.equal(isInjectedUserText('/ctx-version'), true);
+  assert.equal(isInjectedUserText('<command-name>plugin</command-name>'), true);
+  // real prose intent must still pass through
+  assert.equal(isInjectedUserText('we decided to use Postgres for analytics'), false);
+  assert.equal(isInjectedUserText('fix the auth/login redirect bug'), false);
+});
+
 test('extractStatements returns the matching sentence, not the message opener', () => {
   const re = /(?:karar|decided|seçtik|kullanacağız|yapacağız)/i;
   const text = 'Kısa cevap: evet. Postgres kullanacağız çünkü OLAP sorguları ağır. Ayrıca cache ekleyeceğiz.';

@@ -276,7 +276,7 @@ function handlePreToolUse(input, config) {
         const wm = require('./working_memory.js');
         const stat = fs.statSync(filePath);
         const minSize = wmCfg.min_dedup_size_bytes ?? 1024;
-        if (stat.size >= minSize) {
+        if (stat.isFile() && stat.size >= minSize) {
           const content = fs.readFileSync(filePath, 'utf8');
           const decision = wm.dedupDecision(sid, filePath, content, {
             mtime: stat.mtimeMs,

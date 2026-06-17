@@ -21,6 +21,9 @@ const INJECTED_USER_PATTERNS = [
   /\bhook context:/i,
   /\bcaveman\b.*\bhook\b/i,
   /CAVEMAN MODE ACTIVE/i,
+  /^\s*\/[a-z][\w:-]*(\s|$)/i,                                  // slash-command echo: /plugin, /ctx-version, /reload-plugins
+  /^\s*![a-z][\w-]*/i,                                          // bang-command echo: !ctx --version
+  /<\/?(?:command-(?:name|message|args)|local-command-(?:stdout|stderr|caveat))>/i,  // Claude Code command tags
 ];
 
 function isInjectedUserText(text) {

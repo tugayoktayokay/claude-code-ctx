@@ -12,6 +12,8 @@ const NOISY_SNAPSHOT_PATTERNS = [
   /<system-reminder>/i,
   /\bcaveman\b.*\bhook\b/i,
   /CAVEMAN MODE ACTIVE/i,
+  /<\/?(?:command-(?:name|message|args)|local-command-(?:stdout|stderr|caveat))>/i,  // Claude Code command tags
+  /^\s*[!/][a-z][\w:-]*(?:\s|$)/im,                                                  // slash/bang command echo as intent
 ];
 
 function parseDuration(str) {
