@@ -4,7 +4,7 @@
 [![plugin](https://img.shields.io/badge/Claude%20Code-plugin-blueviolet)](#install)
 [![license](https://img.shields.io/npm/l/claude-code-ctx.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/claude-code-ctx.svg)](https://nodejs.org)
-[![tests](https://img.shields.io/badge/tests-174%20passing-brightgreen.svg)](src/test)
+[![tests](https://img.shields.io/badge/tests-320%20passing-brightgreen.svg)](src/test)
 [![deps](https://img.shields.io/badge/deps-0-brightgreen.svg)](package.json)
 
 > ## ⚠️ Prefer the Claude Code plugin install — npm is a fallback
@@ -23,7 +23,7 @@
 
 > 📦 **Package name:** `claude-code-ctx` (npm + Claude Code plugin)
 > 💻 **CLI binary:** `ctx` (short, what you type in terminal)
-> 🪝 **Slash commands:** `/ctx-doctor`, `/ctx-ask`, `/ctx-metrics`, … (29 commands, see below)
+> 🪝 **Slash commands:** `/ctx:doctor`, `/ctx:ask`, `/ctx:metrics`, … (29 commands, see below)
 
 ---
 
@@ -46,9 +46,9 @@ Three layers stacked on Claude Code's hook + MCP systems:
 
 When Claude would otherwise run `Bash("find / -name X")` and get 500 KB back, it calls `ctx_shell` instead: full output is stored in `~/.config/ctx/mcp-cache/<ref>.txt`, context gets a 2 KB summary + ref. Same idea as context-mode, built without SQLite or native deps.
 
-**BM25 search cache.** Tokenized snapshot bodies are cached at `~/.config/ctx/bm25/<encoded-cwd>.json.gz` (gzip format). Speeds up `/ctx-ask` after the first query per project. Safe to delete; rebuilds on next query.
+**BM25 search cache.** Tokenized snapshot bodies are cached at `~/.config/ctx/bm25/<encoded-cwd>.json.gz` (gzip format). Speeds up `/ctx:ask` after the first query per project. Safe to delete; rebuilds on next query.
 
-**CLI + 20 slash commands (user-initiated).** `/ctx-ask`, `/ctx-timeline`, `/ctx-doctor`, `/ctx-report`, etc. — all shell out to the same CLI.
+**CLI + 29 slash commands (user-initiated).** `/ctx:ask`, `/ctx:timeline`, `/ctx:doctor`, `/ctx:report`, etc. — all shell out to the same CLI.
 
 ---
 
@@ -76,7 +76,9 @@ Or via GitHub (same effect):
 /plugin install claude-code-ctx
 ```
 
-Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 20 slash commands automatically. Manage with `/plugin list`, `/plugin disable claude-code-ctx`, `/plugin update claude-code-ctx`.
+Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 29 slash commands automatically. Manage with `/plugin list`, `/plugin disable claude-code-ctx`, `/plugin update claude-code-ctx`.
+
+The install/package name stays `claude-code-ctx`, but the runtime command namespace is intentionally short: `ctx`. Commands appear as `/ctx:doctor`, `/ctx:ask`, `/ctx:version`, not `/claude-code-ctx:ctx-doctor`.
 
 Claude Code also accepts the explicit marketplace-qualified form (`claude-code-ctx@claude-code-ctx`) if you have multiple marketplaces publishing a plugin with the same name, but the short form is the normal install path after adding this marketplace.
 
@@ -107,7 +109,7 @@ No breaking config change. Three wrinkles to know:
 2. **Log schema extended** with `session=<id>` on `pre_tool` and new `post_tool` / `cache-*` event types. Old pre-v0.7 log entries remain readable — `metrics.aggregate()` silently ignores `session-start`, `stop`, `pre-compact`, `pre-tool-use`, `post-tool-use`, `auto-retrieve`, and `hook` events instead of counting them as malformed.
 3. **Customized rules in user config don't auto-merge.** Arrays in `~/.config/ctx/config.json` replace defaults — they don't concatenate. If you've locally customized `hooks.pre_tool_use.rules`, copy the 6 v0.7 additions from `config.default.json` manually.
 
-Slash commands (`/ctx-ask`, `/ctx-doctor`, …) and the CLI binary (`ctx`) are unchanged.
+Slash commands use the short plugin namespace (`/ctx:ask`, `/ctx:doctor`, …); the CLI binary remains `ctx`.
 
 ---
 
@@ -115,35 +117,35 @@ Slash commands (`/ctx-ask`, `/ctx-doctor`, …) and the CLI binary (`ctx`) are u
 
 | command | does |
 |---|---|
-| `/ctx-doctor` | health check (hooks, config, daemon, plugin install) |
-| `/ctx-status` | install state + latest snapshot + latest backup |
-| `/ctx-analyze` | current session: token %, metrics, recommendation |
-| `/ctx-ask <query>` | ranked snapshot search (BM25 + category + recency) |
-| `/ctx-timeline` | threaded parent-chain history |
-| `/ctx-stats` | weekly snapshot/trigger/category aggregate |
-| `/ctx-heavy` | largest tool outputs in this session + tool-specific hints |
-| `/ctx-bloat` | CLAUDE.md + SKILL.md footprint, flag unused skills |
-| `/ctx-usage [--tools\|--skills]` | aggregate usage across recent sessions |
-| `/ctx-compact` | build tailored /compact prompt, copy to clipboard |
-| `/ctx-snapshot [name]` | manual checkpoint |
-| `/ctx-report [path]` | self-contained HTML report |
-| `/ctx-restore [id]` | list / restore gzipped JSONL backups |
-| `/ctx-prune [--apply]` | memory dir cleanup |
-| `/ctx-purge [--apply]` | delete this project's memory + backups |
-| `/ctx-upgrade` | git pull latest source |
-| `/ctx-history [N]` | last N sessions across all projects |
-| `/ctx-config` | show config paths |
-| `/ctx-diff <a.md> <b.md>` | snapshot delta |
-| `/ctx-file <path>` | analyze a specific JSONL |
-| `/ctx-metrics` | **v0.7** — obey rate for pre_tool redirects, top bypass offenders, cache hit rate |
-| `/ctx-plugin-fix` | **v0.7** — recover plugin cache after Claude Code `/plugin update` wipes it |
-| `/ctx-version` | print installed ctx version |
-| `/ctx-setup` | one-shot: install hooks + ensure config |
-| `/ctx-install-hooks` | install just the hooks (idempotent) |
-| `/ctx-uninstall-hooks` | remove ctx hooks; keep foreign hooks |
-| `/ctx-daemon <start\|stop\|status\|log>` | background watcher for non-Claude-Code sessions |
-| `/ctx-watch` | live token % monitor (blocks until Ctrl-C) |
-| `/ctx-statusline` | preview one-line status for Claude Code statusline hook |
+| `/ctx:doctor` | health check (hooks, config, daemon, plugin install) |
+| `/ctx:status` | install state + latest snapshot + latest backup |
+| `/ctx:analyze` | current session: token %, metrics, recommendation |
+| `/ctx:ask <query>` | ranked snapshot search (BM25 + category + recency) |
+| `/ctx:timeline` | threaded parent-chain history |
+| `/ctx:stats` | weekly snapshot/trigger/category aggregate |
+| `/ctx:heavy` | largest tool outputs in the current session with tool-specific hints |
+| `/ctx:bloat` | CLAUDE.md + skill description footprint, flag unused skills |
+| `/ctx:usage [--tools\|--skills]` | aggregate usage across recent sessions |
+| `/ctx:compact` | build tailored /compact prompt, copy to clipboard |
+| `/ctx:snapshot [name]` | manual checkpoint |
+| `/ctx:report [path]` | self-contained HTML report |
+| `/ctx:restore [id]` | list / restore gzipped JSONL backups |
+| `/ctx:prune [--apply]` | memory dir cleanup |
+| `/ctx:purge [--apply]` | delete this project's memory + backups |
+| `/ctx:upgrade` | git pull latest source |
+| `/ctx:history [N]` | last N sessions across all projects |
+| `/ctx:config` | show config paths |
+| `/ctx:diff <a.md> <b.md>` | snapshot delta |
+| `/ctx:file <path>` | analyze a specific JSONL |
+| `/ctx:metrics` | obey rate for pre_tool redirects, top bypass offenders, cache hit rate |
+| `/ctx:plugin-fix` | recover plugin cache after Claude Code `/plugin update` wipes it |
+| `/ctx:version` | print installed ctx version |
+| `/ctx:setup` | one-shot: install hooks + ensure config |
+| `/ctx:install-hooks` | install just the hooks (idempotent) |
+| `/ctx:uninstall-hooks` | remove ctx hooks; keep foreign hooks |
+| `/ctx:daemon <start\|stop\|status\|log>` | background watcher for non-Claude-Code sessions |
+| `/ctx:watch` | live token % monitor (blocks until Ctrl-C) |
+| `/ctx:statusline` | preview one-line status for Claude Code statusline hook |
 
 ---
 
@@ -234,7 +236,7 @@ Observed repeatedly: `/plugin update` or `autoUpdate` wipes `~/.claude/plugins/c
 ```bash
 ctx plugin-fix      # terminal
 # or
-/ctx-plugin-fix     # slash (only works if the slash commands are already loaded)
+/ctx:plugin-fix     # slash (only works if the slash commands are already loaded)
 ```
 
 The subcommand reads `installed_plugins.json`, finds ctx install paths that don't resolve, and restores them by `cp -R` from the stable marketplace checkout. Idempotent: "nothing to fix" when everything resolves. Tracked as an upstream bug; workaround until Anthropic patches it.
@@ -256,7 +258,7 @@ Disable GC with `config.cache.gc.enabled: false`.
 
 Past snapshots are not a write-only archive. ctx ranks them with a BM25 hybrid (IDF + category overlap + recency decay, Porter-lite stemming, Levenshtein fuzzy fallback) and Claude's UserPromptSubmit hook auto-retrieves the best match for your first 1–2 prompts of a new session — so you pick up where you left off instead of re-explaining context.
 
-**Explicit recall** via `ctx ask` / `/ctx-ask`:
+**Explicit recall** via `ctx ask` / `/ctx:ask`:
 ```
 ctx ask "stripe webhook"
   # → top 3 snapshots with score breakdown (category/keyword/recency)

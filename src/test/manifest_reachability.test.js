@@ -49,6 +49,19 @@ function pluginMatchers(eventName) {
   return new Set(groups.map(g => g.matcher || '*'));
 }
 
+test('plugin runtime namespace is short and command filenames are not double-prefixed', () => {
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
+  assert.equal(plugin.name, 'ctx');
+
+  const commandsDir = path.join(ROOT, 'commands');
+  const commandNames = fs.readdirSync(commandsDir).filter(name => name.endsWith('.md'));
+  assert.ok(commandNames.length > 0, 'commands are packaged');
+  assert.deepEqual(commandNames.filter(name => name.startsWith('ctx-')), []);
+  assert.ok(commandNames.includes('version.md'), 'expected /ctx:version command source');
+  assert.ok(commandNames.includes('snapshot.md'), 'expected /ctx:snapshot command source');
+  assert.ok(commandNames.includes('compact.md'), 'expected /ctx:compact command source');
+});
+
 test('plugin PreToolUse manifest reaches every tool-specific pre-tool branch', () => {
   const referenced = toolNamesReferencedByPreToolHook();
   const matchers = pluginMatchers('PreToolUse');

@@ -58,6 +58,7 @@ test('isInjectedUserText catches slash/bang command echoes (snapshot naming nois
   assert.equal(isInjectedUserText('/plugin update claude-code-ctx'), true);
   assert.equal(isInjectedUserText(' /reload-plugins'), true);
   assert.equal(isInjectedUserText('/ctx-version'), true);
+  assert.equal(isInjectedUserText('/ctx:version'), true);
   assert.equal(isInjectedUserText('<command-name>plugin</command-name>'), true);
   // real prose intent must still pass through
   assert.equal(isInjectedUserText('we decided to use Postgres for analytics'), false);
