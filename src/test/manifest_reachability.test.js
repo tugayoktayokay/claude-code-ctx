@@ -62,6 +62,17 @@ test('plugin runtime namespace is short and command filenames are not double-pre
   assert.ok(commandNames.includes('compact.md'), 'expected /ctx:compact command source');
 });
 
+test('marketplace plugin entry name matches plugin.json name (Claude Code requires identity)', () => {
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
+  const marketplace = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'marketplace.json'), 'utf8'));
+  const entry = marketplace.plugins.find(p => p.source === './');
+  assert.ok(entry, 'self-hosted plugin entry present in marketplace');
+  // Slash namespace + MCP prefix derive from plugin.json name; install handle derives
+  // from the marketplace entry name. They MUST be identical or install resolution breaks.
+  assert.equal(entry.name, plugin.name);
+  assert.equal(entry.name, 'ctx');
+});
+
 test('plugin PreToolUse manifest reaches every tool-specific pre-tool branch', () => {
   const referenced = toolNamesReferencedByPreToolHook();
   const matchers = pluginMatchers('PreToolUse');

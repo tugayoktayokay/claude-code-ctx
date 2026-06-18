@@ -12,7 +12,7 @@
 > Starting with **v0.4.0**, the primary distribution is the Claude Code plugin. The npm package (`claude-code-ctx`) still works but is the secondary path: no auto-updates, no auto-registered slash commands, you must run `ctx setup` manually.
 >
 > **If you're installing today → use the plugin**, see [Install](#install) below.
-> **If you already installed via npm → still works**, but consider migrating (`ctx uninstall-hooks` then `/plugin install claude-code-ctx`).
+> **If you already installed via npm → still works**, but consider migrating (`ctx uninstall-hooks` then `/plugin install ctx@claude-code-ctx`).
 
 ---
 
@@ -21,7 +21,7 @@
 >
 > **Zero runtime dependencies. No LLM calls. Pure Node 18+.**
 
-> 📦 **Package name:** `claude-code-ctx` (npm + Claude Code plugin)
+> 📦 **npm package:** `claude-code-ctx` · **plugin name:** `ctx` · **marketplace:** `claude-code-ctx` → install `ctx@claude-code-ctx`
 > 💻 **CLI binary:** `ctx` (short, what you type in terminal)
 > 🪝 **Slash commands:** `/ctx:doctor`, `/ctx:ask`, `/ctx:metrics`, … (29 commands, see below)
 
@@ -66,21 +66,19 @@ Then inside any Claude Code session:
 
 ```
 /plugin marketplace add /Users/you/tools/claude-code-ctx
-/plugin install claude-code-ctx
+/plugin install ctx@claude-code-ctx
 ```
 
 Or via GitHub (same effect):
 
 ```
 /plugin marketplace add tugayoktayokay/claude-code-ctx
-/plugin install claude-code-ctx
+/plugin install ctx@claude-code-ctx
 ```
 
-Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 29 slash commands automatically. Manage with `/plugin list`, `/plugin disable claude-code-ctx`, `/plugin update claude-code-ctx`.
+Claude Code reads `.claude-plugin/plugin.json`, registers 6 hooks + MCP server + 29 slash commands automatically. Manage with `/plugin list`, `/plugin disable ctx`, `/plugin update ctx`.
 
-The install/package name stays `claude-code-ctx`, but the runtime command namespace is intentionally short: `ctx`. Commands appear as `/ctx:doctor`, `/ctx:ask`, `/ctx:version`, not `/claude-code-ctx:ctx-doctor`.
-
-Claude Code also accepts the explicit marketplace-qualified form (`claude-code-ctx@claude-code-ctx`) if you have multiple marketplaces publishing a plugin with the same name, but the short form is the normal install path after adding this marketplace.
+Names: the **plugin** is `ctx` (drives the runtime namespace and MCP prefix), hosted in the **marketplace** `claude-code-ctx`, distributed on **npm** as `claude-code-ctx`. So you install with `ctx@claude-code-ctx` but the commands appear as `/ctx:doctor`, `/ctx:ask`, `/ctx:version` — not `/claude-code-ctx:ctx-doctor`.
 
 ### Alternative: npm + manual setup
 
@@ -92,14 +90,16 @@ ctx status        # verify
 
 Both paths coexist without conflict. Plugin path auto-updates; npm path needs `ctx upgrade`. If you installed both, `ctx status` warns and `ctx uninstall-hooks` clears the manual copy.
 
-### Migrating from 0.3.0
+### Migrating to 0.8.22 (plugin renamed `claude-code-ctx` → `ctx`)
 
-Version 0.4.0 renames the plugin identifier from `ctx` to `claude-code-ctx` so it matches the npm package + marketplace. If you installed 0.3.0:
+Breaking for plugin installs only. v0.8.22 shortens the plugin name back to `ctx`, so the runtime namespace becomes `/ctx:*` and MCP tools become `mcp__plugin_ctx_ctx__*`. The old `claude-code-ctx` install won't auto-update to the new name — reinstall once:
 
 ```
-/plugin uninstall ctx@claude-code-ctx
-/plugin install claude-code-ctx
+/plugin uninstall claude-code-ctx@claude-code-ctx
+/plugin install ctx@claude-code-ctx
 ```
+
+The npm package and the marketplace handle stay `claude-code-ctx`; only the plugin name changed. `ctx metrics` reads both the legacy `mcp__plugin_claude-code-ctx_*` and new `mcp__plugin_ctx_*` tool names, so historical metrics survive the rename.
 
 ### Migrating from 0.6.0 → 0.7.x
 
