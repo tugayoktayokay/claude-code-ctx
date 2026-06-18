@@ -1,0 +1,30 @@
+.claude-plugin/marketplace.json
+  s_f624d41decf0e3::t_cdb481763af384 10
+src/test/manifest_reachability.test.js
+  s_f624d41decf0e3::t_bdb5a6ca023210 65-75
+.claude-plugin/plugin.json
+  s_f624d41decf0e3::t_d68d8a9df188b7 3
+package.json
+  s_f624d41decf0e3::t_d68d8a9df188b7 3
+README.md
+  s_f624d41decf0e3::t_8c49895e5a75b8 15
+  s_f624d41decf0e3::t_1b5e5407080206 93,95,98-99,102
+  s_f624d41decf0e3::t_9a4d86e457bb74 24
+  s_f624d41decf0e3::t_b99297ebaf40e8 69,76,79,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "683622ae62479bd1b43ed7f483455b8b3d386d5c",
+  "prompts": {},
+  "sessions": {
+    "s_f624d41decf0e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0884dfeb-5869-4883-b681-f000652558f8",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
