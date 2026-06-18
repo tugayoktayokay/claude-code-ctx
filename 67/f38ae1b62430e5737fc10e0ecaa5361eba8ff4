@@ -1,0 +1,29 @@
+src/test/doctor.test.js
+  s_d6f128755d0ae5::t_e38ba59d5c53d9 82-83,122-123
+package.json
+  s_d6f128755d0ae5::t_9d1ec5b19e89ef 3
+README.md
+  s_d6f128755d0ae5::t_4666318826eff4 15,24,69,76,79-81,99
+src/cli.js
+  s_d6f128755d0ae5::t_8233cdd92b0929 433,907
+src/doctor.js
+  s_d6f128755d0ae5::t_2145739fba3990 185,204
+.claude-plugin/plugin.json
+  s_d6f128755d0ae5::t_964a8db6079792 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "67f38ae1b62430e5737fc10e0ecaa5361eba8ff4",
+  "prompts": {},
+  "sessions": {
+    "s_d6f128755d0ae5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecf47-5716-7ad0-9fb0-f848699a891d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
