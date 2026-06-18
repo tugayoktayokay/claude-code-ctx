@@ -1,0 +1,21 @@
+.claude-plugin/plugin.json
+  s_f624d41decf0e3::t_95036666f7c558 3
+package.json
+  s_f624d41decf0e3::t_95036666f7c558 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "61552f44e0a4482f2d1c598b102b32d18c222926",
+  "prompts": {},
+  "sessions": {
+    "s_f624d41decf0e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0884dfeb-5869-4883-b681-f000652558f8",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
