@@ -107,40 +107,54 @@ function checkConfig() {
   return out;
 }
 
-function checkPluginRegistration() {
+// Match both the canonical plugin name (`ctx`, since 0.8.23) and the legacy
+// name (`claude-code-ctx`, ≤0.8.22). When both are still registered during a
+// rename migration, prefer the canonical `ctx@` entry so doctor reports the
+// live install, not the stale legacy one.
+function isCtxPluginKey(key) {
+  return key.startsWith('ctx@') || key === 'ctx' ||
+         key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx';
+}
+
+function selectCtxPlugin(plugins) {
+  const keys = Object.keys(plugins).filter(isCtxPluginKey);
+  if (keys.length === 0) return null;
+  // Canonical `ctx`-named keys win over legacy `claude-code-ctx` keys.
+  keys.sort((a, b) => {
+    const aCanon = a === 'ctx' || a.startsWith('ctx@');
+    const bCanon = b === 'ctx' || b.startsWith('ctx@');
+    return (bCanon ? 1 : 0) - (aCanon ? 1 : 0);
+  });
+  const key = keys[0];
+  const entries = plugins[key];
+  const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
+  return { key, latest };
+}
+
+function readInstalledPlugins() {
   const installedPath = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
   if (!fs.existsSync(installedPath)) return null;
   try {
-    const reg = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
-    const plugins = reg?.plugins || {};
-    for (const key of Object.keys(plugins)) {
-      if (key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx' || key.startsWith('ctx@') || key === 'ctx') {
-        const entries = plugins[key];
-        const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
-        return { ...CHECKS.ok, label: 'Plugin install', detail: `${key} v${latest?.version || '?'} (${latest?.installPath || 'unknown'})` };
-      }
-    }
-    return null;
+    return JSON.parse(fs.readFileSync(installedPath, 'utf8'))?.plugins || {};
   } catch {
     return null;
   }
 }
 
+function checkPluginRegistration() {
+  const plugins = readInstalledPlugins();
+  if (!plugins) return null;
+  const sel = selectCtxPlugin(plugins);
+  if (!sel) return null;
+  return { ...CHECKS.ok, label: 'Plugin install', detail: `${sel.key} v${sel.latest?.version || '?'} (${sel.latest?.installPath || 'unknown'})` };
+}
+
 function findCtxPluginInstall() {
-  const installedPath = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
-  if (!fs.existsSync(installedPath)) return null;
-  try {
-    const reg = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
-    const plugins = reg?.plugins || {};
-    for (const key of Object.keys(plugins)) {
-      if (key.startsWith('claude-code-ctx@') || key === 'claude-code-ctx' || key.startsWith('ctx@') || key === 'ctx') {
-        const entries = plugins[key];
-        const latest = Array.isArray(entries) ? entries[entries.length - 1] : entries;
-        return { key, ...latest };
-      }
-    }
-  } catch {}
-  return null;
+  const plugins = readInstalledPlugins();
+  if (!plugins) return null;
+  const sel = selectCtxPlugin(plugins);
+  if (!sel) return null;
+  return { key: sel.key, ...sel.latest };
 }
 
 function hookMatchers(installPath, eventName) {
