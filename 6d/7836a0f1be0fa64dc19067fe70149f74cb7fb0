@@ -1,0 +1,19 @@
+src/doctor.js
+  s_f624d41decf0e3::t_2184a7e54762af 110-134,138,144-151,153-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "6d7836a0f1be0fa64dc19067fe70149f74cb7fb0",
+  "prompts": {},
+  "sessions": {
+    "s_f624d41decf0e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0884dfeb-5869-4883-b681-f000652558f8",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
