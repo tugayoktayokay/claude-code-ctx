@@ -1,0 +1,37 @@
+README.md
+  s_d6f128755d0ae5::t_0d547c5ab142ca 7
+  s_d6f128755d0ae5::t_fa9300e1e0145b 239,261
+  s_d6f128755d0ae5::t_7d0da0fab85e5f 26,49,51,79-81,112,120-148
+src/test/metrics.test.js
+  s_d6f128755d0ae5::t_c788e9310d98ee 189-198
+src/metrics.js
+  s_d6f128755d0ae5::t_aeede22f9d107c 93-94,97
+src/analyzer.js
+  s_d6f128755d0ae5::t_2179829d0c8130 24
+src/test/analyzer.test.js
+  s_d6f128755d0ae5::t_06c1080ff0d93e 61
+.claude-plugin/plugin.json
+  s_d6f128755d0ae5::t_11398763d32cac 2-3
+src/test/manifest_reachability.test.js
+  s_d6f128755d0ae5::t_f0469ca3993a00 52-64
+package.json
+  s_d6f128755d0ae5::t_d05368faf48ed5 3
+commands/ask.md
+  s_d6f128755d0ae5::t_0c4a999ec7e6b8 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "6ee58fb2485ff198878d8d03d133c96021043b8e",
+  "prompts": {},
+  "sessions": {
+    "s_d6f128755d0ae5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecf47-5716-7ad0-9fb0-f848699a891d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "TUGAY OKTAY OKAY <tugayoktay.okay@globalbilgi.com.tr>"
+    }
+  }
+}
