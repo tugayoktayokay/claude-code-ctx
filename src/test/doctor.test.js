@@ -79,6 +79,8 @@ test('doctor warns when enabled working_memory is not reachable from plugin mani
     assert.equal(rows.length, 1);
     assert.equal(rows[0].level, 'warn');
     assert.match(rows[0].detail, /Read/);
+    assert.match(rows[0].detail, /\/plugin update claude-code-ctx\b/);
+    assert.doesNotMatch(rows[0].detail, /claude-code-ctx@claude-code-ctx/);
   });
 });
 
@@ -117,6 +119,8 @@ test('doctor warns when installed plugin version differs from source version', (
     assert.equal(rows.length, 1);
     assert.equal(rows[0].level, 'warn');
     assert.match(rows[0].detail, /installed vtest, source v/);
+    assert.match(rows[0].detail, /\/plugin update claude-code-ctx\b/);
+    assert.doesNotMatch(rows[0].detail, /claude-code-ctx@claude-code-ctx/);
   });
 });
 

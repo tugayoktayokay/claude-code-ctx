@@ -182,7 +182,7 @@ function checkFeatureWiring() {
     out.push({
       ...CHECKS.warn,
       label: 'Feature wiring',
-      detail: `working_memory enabled but plugin PreToolUse does not reach: ${missing.join(', ')} — run /plugin update claude-code-ctx@claude-code-ctx`,
+      detail: `working_memory enabled but plugin PreToolUse does not reach: ${missing.join(', ')} — run /plugin update claude-code-ctx`,
     });
   } else {
     out.push({ ...CHECKS.ok, label: 'Feature wiring', detail: 'enabled features are reachable from plugin manifest' });
@@ -201,7 +201,7 @@ function checkPluginVersionDrift() {
   return [{
     ...CHECKS.warn,
     label: 'Plugin version',
-    detail: `installed v${installedVersion}, source v${localVersion} — run /plugin marketplace update claude-code-ctx && /plugin update claude-code-ctx@claude-code-ctx`,
+    detail: `installed v${installedVersion}, source v${localVersion} — run /plugin marketplace update claude-code-ctx && /plugin update claude-code-ctx`,
   }];
 }
 

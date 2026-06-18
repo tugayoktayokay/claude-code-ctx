@@ -430,7 +430,7 @@ function runStatus(_args, config) {
   } else if (manualHooksCount) {
     console.log(`    ${C.green}✓ manual${C.reset}  ctx setup hooks (${manualHooksCount} events)`);
   } else {
-    console.log(`    ${C.yellow}⚠ not installed${C.reset}  — 'ctx setup' OR '/plugin install claude-code-ctx@claude-code-ctx'`);
+    console.log(`    ${C.yellow}⚠ not installed${C.reset}  — 'ctx setup' OR '/plugin install claude-code-ctx'`);
   }
   console.log('');
 
@@ -904,7 +904,7 @@ function runPluginFix(_args, _config) {
       }
       const marketplace = path.join(home, '.claude', 'plugins', 'marketplaces', 'claude-code-ctx');
       if (!fs.existsSync(marketplace)) {
-        console.error(`  ❌ marketplace missing: ${marketplace} — run /plugin install claude-code-ctx@claude-code-ctx`);
+        console.error(`  ❌ marketplace missing: ${marketplace} — run /plugin marketplace add tugayoktayokay/claude-code-ctx`);
         continue;
       }
       console.log(`  ⟳ ${name} cache missing → copying from ${marketplace}`);
